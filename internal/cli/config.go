@@ -25,7 +25,7 @@ func newConfigShowCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show",
 		Short: "Show the fully resolved effective configuration",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			cfg, err := resolveConfig()
 			if err != nil {
 				return err
@@ -54,7 +54,7 @@ func newConfigExplainCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "explain",
 		Short: "Show effective configuration with the source of each value",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			cfg, err := resolveConfig()
 			if err != nil {
 				return err

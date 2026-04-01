@@ -216,7 +216,10 @@ func (c *Client) OpenInBrowser(ctx context.Context, fullName string) error {
 	args := []string{"repo", "view", fullName, "--web"}
 	args = append(args, c.hostArgs()...)
 	_, _, err := c.Runner.Run(ctx, "gh", args...)
-	return err
+	if err != nil {
+		return fmt.Errorf("opening repository in browser: %w", err)
+	}
+	return nil
 }
 
 // repoJSON is the structure returned by gh repo view --json.
@@ -265,7 +268,7 @@ func (c *Client) FetchRepoState(ctx context.Context, fullName string) (*policy.A
 }
 
 // ApplySecuritySettings applies security-related settings.
-func (c *Client) ApplySecuritySettings(ctx context.Context, fullName string, p *policy.DesiredPolicy, strict bool) (applied []string, warnings []string) {
+func (c *Client) ApplySecuritySettings(ctx context.Context, fullName string, p *policy.DesiredPolicy, _ bool) (applied []string, warnings []string) {
 	if p.DependabotAlerts {
 		if err := c.EnableVulnerabilityAlerts(ctx, fullName); err != nil {
 			warnings = append(warnings, err.Error())

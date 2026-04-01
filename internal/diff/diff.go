@@ -22,7 +22,7 @@ type Entry struct {
 	Field         string `json:"field"`
 	Current       any    `json:"current"`
 	Desired       any    `json:"desired"`
-	DesiredSource string `json:"desired_source"`
+	DesiredSource string `json:"desiredSource"`
 	Status        Status `json:"status"`
 }
 

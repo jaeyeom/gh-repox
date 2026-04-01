@@ -45,17 +45,25 @@ check-format:
 
 # ── Lint / Fix ──────────────────────────────────────────────────────
 
-.PHONY: lint fix vet
+.PHONY: lint fix vet lint-golangci fix-golangci
 
-## lint: run go vet (add golangci-lint when .golangci.yml exists)
-lint: vet
+## lint: run go vet and golangci-lint
+lint: vet lint-golangci
 
-## fix: format then vet (ordering ensures no concurrent writes)
-fix: format vet
+## fix: format, vet, and golangci-lint auto-fix
+fix: format vet fix-golangci
 
 ## vet: run go vet on all packages
 vet:
 	go vet ./...
+
+## lint-golangci: run golangci-lint
+lint-golangci:
+	golangci-lint run ./...
+
+## fix-golangci: run golangci-lint with auto-fix
+fix-golangci:
+	golangci-lint run --fix ./...
 
 # ── Test ────────────────────────────────────────────────────────────
 

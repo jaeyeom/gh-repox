@@ -16,7 +16,7 @@ type CreateResult struct {
 	Repo        string         `json:"repo"`
 	URL         string         `json:"url"`
 	Created     bool           `json:"created"`
-	OwnerSource string         `json:"owner_source"`
+	OwnerSource string         `json:"ownerSource"`
 	Applied     map[string]any `json:"applied"`
 	Clone       CloneResult    `json:"clone"`
 	Warnings    []string       `json:"warnings"`
@@ -54,11 +54,12 @@ func PrintCreateHuman(w io.Writer, r *CreateResult) {
 		}
 	}
 	fmt.Fprintln(w, "\nClone:")
-	if !r.Clone.Requested {
+	switch {
+	case !r.Clone.Requested:
 		fmt.Fprintln(w, "- skipped")
-	} else if r.Clone.Completed {
+	case r.Clone.Completed:
 		fmt.Fprintf(w, "- completed at %s\n", r.Clone.Directory)
-	} else {
+	default:
 		fmt.Fprintln(w, "- failed")
 	}
 	if len(r.Warnings) > 0 {
@@ -96,7 +97,10 @@ func PrintDiffHuman(w io.Writer, r *DiffResult) {
 func PrintJSON(w io.Writer, v any) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	return enc.Encode(v)
+	if err := enc.Encode(v); err != nil {
+		return fmt.Errorf("encoding JSON output: %w", err)
+	}
+	return nil
 }
 
 // PrintConfigShow prints resolved config values.

@@ -19,15 +19,15 @@ func newApplyCmd() *cobra.Command {
 		Use:   "apply <owner/repo>",
 		Short: "Apply resolved policy to an existing repository",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
 
 			owner, repo, err := validate.ParseOwnerRepo(args[0])
 			if err != nil {
-				return err
+				return fmt.Errorf("parse repo: %w", err)
 			}
-			if err := validate.ValidateApply(owner, repo); err != nil {
-				return err
+			if err := validate.Apply(owner, repo); err != nil {
+				return fmt.Errorf("validate apply: %w", err)
 			}
 
 			cfg, err := resolveConfig()
@@ -58,7 +58,7 @@ func newApplyCmd() *cobra.Command {
 			// Check repo exists
 			exists, err := client.RepoExists(ctx, fullName)
 			if err != nil {
-				return err
+				return fmt.Errorf("check repo exists: %w", err)
 			}
 			if !exists {
 				return fmt.Errorf("repository %s does not exist", fullName)
@@ -72,7 +72,7 @@ func newApplyCmd() *cobra.Command {
 			// Apply settings
 			if err := client.EditRepo(ctx, fullName, p); err != nil {
 				if cfg.Strict.Value {
-					return err
+					return fmt.Errorf("edit repo: %w", err)
 				}
 				result.Warnings = append(result.Warnings, err.Error())
 			} else {

@@ -41,7 +41,7 @@ repo:
 merge:
   allow_merge_commit: true
 `
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	c := Defaults()
@@ -99,7 +99,7 @@ func TestPrecedence(t *testing.T) {
 github:
   host: config-host.com
 `
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	c := Defaults()

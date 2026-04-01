@@ -7,8 +7,8 @@ import (
 	"github.com/jaeyeom/gh-repox/internal/policy"
 )
 
-// ValidateCreate validates a desired policy for repository creation.
-func ValidateCreate(p *policy.DesiredPolicy) error {
+// Create validates a desired policy for repository creation.
+func Create(p *policy.DesiredPolicy) error {
 	if p.Owner == "" {
 		return fmt.Errorf("owner is required: run `gh auth login`, or pass --owner or --org")
 	}
@@ -24,8 +24,8 @@ func ValidateCreate(p *policy.DesiredPolicy) error {
 	return nil
 }
 
-// ValidateApply validates a desired policy for applying to an existing repo.
-func ValidateApply(owner, repo string) error {
+// Apply validates a desired policy for applying to an existing repo.
+func Apply(owner, repo string) error {
 	if owner == "" || repo == "" {
 		return fmt.Errorf("owner/repo is required (e.g., octocat/my-repo)")
 	}

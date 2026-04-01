@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -189,12 +190,22 @@ func (c *Config) LoadFile(path string) error {
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("reading config file: %w", err)
 	}
 	var yc yamlConfig
 	if err := yaml.Unmarshal(data, &yc); err != nil {
-		return err
+		return fmt.Errorf("parsing config file: %w", err)
 	}
+	c.applyGitHub(yc)
+	c.applyRepo(yc)
+	c.applyMerge(yc)
+	c.applySecurity(yc)
+	c.applyClone(yc)
+	c.applyBehavior(yc)
+	return nil
+}
+
+func (c *Config) applyGitHub(yc yamlConfig) {
 	if yc.GitHub.Host != nil {
 		c.Host.Set(*yc.GitHub.Host, SourceConfig)
 	}
@@ -204,6 +215,9 @@ func (c *Config) LoadFile(path string) error {
 	if yc.GitHub.Org != nil {
 		c.Org.Set(*yc.GitHub.Org, SourceConfig)
 	}
+}
+
+func (c *Config) applyRepo(yc yamlConfig) {
 	if yc.Repo.Private != nil {
 		c.Private.Set(*yc.Repo.Private, SourceConfig)
 	}
@@ -234,6 +248,9 @@ func (c *Config) LoadFile(path string) error {
 	if yc.Repo.Template != nil {
 		c.Template.Set(*yc.Repo.Template, SourceConfig)
 	}
+}
+
+func (c *Config) applyMerge(yc yamlConfig) {
 	if yc.Merge.AllowSquashMerge != nil {
 		c.AllowSquashMerge.Set(*yc.Merge.AllowSquashMerge, SourceConfig)
 	}
@@ -249,6 +266,9 @@ func (c *Config) LoadFile(path string) error {
 	if yc.Merge.DeleteBranchOnMerge != nil {
 		c.DeleteBranchOnMerge.Set(*yc.Merge.DeleteBranchOnMerge, SourceConfig)
 	}
+}
+
+func (c *Config) applySecurity(yc yamlConfig) {
 	if yc.Security.DependencyGraph != nil {
 		c.DependencyGraph.Set(*yc.Security.DependencyGraph, SourceConfig)
 	}
@@ -258,6 +278,9 @@ func (c *Config) LoadFile(path string) error {
 	if yc.Security.DependabotSecurityUpdates != nil {
 		c.DependabotSecurityUpdates.Set(*yc.Security.DependabotSecurityUpdates, SourceConfig)
 	}
+}
+
+func (c *Config) applyClone(yc yamlConfig) {
 	if yc.Clone.AfterCreate != nil {
 		c.CloneAfterCreate.Set(*yc.Clone.AfterCreate, SourceConfig)
 	}
@@ -267,6 +290,9 @@ func (c *Config) LoadFile(path string) error {
 	if yc.Clone.ExtraArgs != nil {
 		c.CloneExtraArgs.Set(yc.Clone.ExtraArgs, SourceConfig)
 	}
+}
+
+func (c *Config) applyBehavior(yc yamlConfig) {
 	if yc.Behavior.DryRun != nil {
 		c.DryRun.Set(*yc.Behavior.DryRun, SourceConfig)
 	}
@@ -279,7 +305,6 @@ func (c *Config) LoadFile(path string) error {
 	if yc.Behavior.OpenRepo != nil {
 		c.OpenRepo.Set(*yc.Behavior.OpenRepo, SourceConfig)
 	}
-	return nil
 }
 
 // LoadEnv applies environment variable overrides.

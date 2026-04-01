@@ -15,6 +15,9 @@ type Runner interface {
 // RealRunner executes real subprocesses.
 type RealRunner struct{}
 
+// Compile-time check that RealRunner implements Runner.
+var _ Runner = (*RealRunner)(nil)
+
 func (r *RealRunner) Run(ctx context.Context, name string, args ...string) (string, string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	var outBuf, errBuf bytes.Buffer
@@ -40,7 +43,7 @@ type MockRunner struct {
 	callIdx   int
 }
 
-func (m *MockRunner) Run(ctx context.Context, name string, args ...string) (string, string, error) {
+func (m *MockRunner) Run(_ context.Context, name string, args ...string) (string, string, error) {
 	call := MockCall{Name: name, Args: args}
 	m.Calls = append(m.Calls, call)
 	if m.callIdx < len(m.Responses) {

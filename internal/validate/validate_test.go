@@ -6,7 +6,7 @@ import (
 	"github.com/jaeyeom/gh-repox/internal/policy"
 )
 
-func TestValidateCreate(t *testing.T) {
+func TestCreate(t *testing.T) {
 	tests := []struct {
 		name    string
 		policy  *policy.DesiredPolicy
@@ -41,7 +41,7 @@ func TestValidateCreate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateCreate(tt.policy)
+			err := Create(tt.policy)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateCreate() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -49,11 +49,11 @@ func TestValidateCreate(t *testing.T) {
 	}
 }
 
-func TestValidateApply(t *testing.T) {
-	if err := ValidateApply("owner", "repo"); err != nil {
+func TestApply(t *testing.T) {
+	if err := Apply("owner", "repo"); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := ValidateApply("", "repo"); err == nil {
+	if err := Apply("", "repo"); err == nil {
 		t.Error("expected error for empty owner")
 	}
 }

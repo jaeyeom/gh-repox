@@ -20,12 +20,12 @@ func newDiffCmd() *cobra.Command {
 		Use:   "diff <owner/repo>",
 		Short: "Show drift between current repo settings and desired policy",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
 
 			owner, repo, err := validate.ParseOwnerRepo(args[0])
 			if err != nil {
-				return err
+				return fmt.Errorf("parse repo: %w", err)
 			}
 
 			cfg, err := resolveConfig()
@@ -42,7 +42,7 @@ func newDiffCmd() *cobra.Command {
 
 			actual, err := client.FetchRepoState(ctx, fullName)
 			if err != nil {
-				return err
+				return fmt.Errorf("fetch repo state: %w", err)
 			}
 
 			entries := diff.Compare(p, actual, cfg)

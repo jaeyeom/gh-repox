@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jaeyeom/gh-repox/internal/config"
 	"github.com/jaeyeom/gh-repox/internal/exec"
@@ -15,7 +16,7 @@ func resolveConfig() (*config.Config, error) {
 	// Load config file
 	path := config.FindConfigFile(flagConfig)
 	if err := cfg.LoadFile(path); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load config file: %w", err)
 	}
 
 	// Load env
@@ -61,7 +62,7 @@ func resolveOwner(ctx context.Context, cfg *config.Config) error {
 	client := ghclient.NewClient(runner, cfg.Host.Value)
 	login, err := client.GetAuthenticatedUser(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("get authenticated user: %w", err)
 	}
 	cfg.Owner.Set(login, config.SourceInferred)
 	return nil

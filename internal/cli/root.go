@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -44,5 +46,8 @@ func newRootCmd() *cobra.Command {
 
 // Execute runs the root command.
 func Execute() error {
-	return newRootCmd().Execute()
+	if err := newRootCmd().Execute(); err != nil {
+		return fmt.Errorf("execute: %w", err)
+	}
+	return nil
 }
