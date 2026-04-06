@@ -184,7 +184,7 @@ func applyCreateInitFlags(
 func printCreateDryRun(repoName string, p *policy.DesiredPolicy, cfg *config.Config) {
 	header := fmt.Sprintf("Dry run: gh repox create %s\n\nResolved target:\n- repo: %s\n- owner source: %s\n- visibility: %s\n- init: %s\n- clone after create: %v",
 		repoName, p.FullName(), cfg.Owner.Source, visibilityStr(p.Private), initStr(p), p.CloneAfterCreate)
-	cmds := ghclient.PlannedCommands(p)
+	cmds := ghclient.PlannedCommands(p, cfg.Host.Value)
 	output.PrintDryRun(os.Stdout, header, cmds)
 }
 

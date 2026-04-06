@@ -186,7 +186,7 @@ func TestPlannedCommands(t *testing.T) {
 		DependabotAlerts: true,
 		CloneAfterCreate: true,
 	}
-	cmds := PlannedCommands(p)
+	cmds := PlannedCommands(p, "")
 	if len(cmds) < 3 {
 		t.Errorf("expected at least 3 commands, got %d", len(cmds))
 	}
@@ -238,7 +238,7 @@ func TestPlannedSecurityCommands(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmds := PlannedSecurityCommands("owner/repo", tt.policy)
+			cmds := PlannedSecurityCommands("owner/repo", tt.policy, "")
 			if len(cmds) != 3 {
 				t.Fatalf("expected 3 commands, got %d", len(cmds))
 			}

@@ -18,6 +18,9 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Run checks
+        run: make check
+
       - name: Build binaries
         run: |
           platforms=(

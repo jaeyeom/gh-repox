@@ -22,11 +22,16 @@ func NewClient(runner exec.Runner, host string) *Client {
 	return &Client{Runner: runner, Host: host}
 }
 
-func (c *Client) hostArgs() []string {
-	if c.Host != "" && c.Host != "github.com" {
-		return []string{"--hostname", c.Host}
+// HostArgs returns the --hostname flag pair for a non-default GitHub host.
+func HostArgs(host string) []string {
+	if host != "" && host != "github.com" {
+		return []string{"--hostname", host}
 	}
 	return nil
+}
+
+func (c *Client) hostArgs() []string {
+	return HostArgs(c.Host)
 }
 
 // GetAuthenticatedUser returns the current authenticated user login.
@@ -122,13 +127,10 @@ func EditRepoArgs(fullName string, p *policy.DesiredPolicy) []string {
 	} else {
 		args = append(args, "--visibility", "public")
 	}
+	args = append(args, "--accept-visibility-change-consequences")
 
-	if p.Description != "" {
-		args = append(args, "--description", p.Description)
-	}
-	if p.Homepage != "" {
-		args = append(args, "--homepage", p.Homepage)
-	}
+	args = append(args, "--description", p.Description)
+	args = append(args, "--homepage", p.Homepage)
 
 	// Features
 	if p.HasIssues {
@@ -163,9 +165,7 @@ func EditRepoArgs(fullName string, p *policy.DesiredPolicy) []string {
 	} else {
 		args = append(args, "--disable-auto-merge")
 	}
-	if p.DeleteBranchOnMerge {
-		args = append(args, "--delete-branch-on-merge")
-	}
+	args = append(args, fmt.Sprintf("--delete-branch-on-merge=%t", p.DeleteBranchOnMerge))
 	if p.HasProjects {
 		args = append(args, "--enable-projects")
 	} else {
@@ -285,8 +285,15 @@ func CloneRepoArgs(fullName string, dir string, extraArgs []string) []string {
 
 // CloneRepo clones a repository.
 func (c *Client) CloneRepo(ctx context.Context, fullName string, dir string, extraArgs []string) error {
-	args := CloneRepoArgs(fullName, dir, extraArgs)
+	args := []string{"repo", "clone", fullName}
+	if dir != "" {
+		args = append(args, dir)
+	}
 	args = append(args, c.hostArgs()...)
+	if len(extraArgs) > 0 {
+		args = append(args, "--")
+		args = append(args, extraArgs...)
+	}
 	_, stderr, err := c.Runner.Run(ctx, "gh", args...)
 	if err != nil {
 		return fmt.Errorf("clone failed: %s: %w", strings.TrimSpace(stderr), err)
@@ -459,36 +466,59 @@ func (c *Client) ApplySecuritySettings(ctx context.Context, fullName string, p *
 	return applied, warnings
 }
 
-// PlannedCommands returns the list of commands that would be executed.
 // PlannedSecurityCommands returns the security-related commands that would be executed.
-func PlannedSecurityCommands(fullName string, p *policy.DesiredPolicy) []string {
+func PlannedSecurityCommands(fullName string, p *policy.DesiredPolicy, host string) []string {
+	ha := HostArgs(host)
+	hostSuffix := ""
+	if len(ha) > 0 {
+		hostSuffix = " " + strings.Join(ha, " ")
+	}
 	var cmds []string
 	if p.DependencyGraph {
-		cmds = append(cmds, fmt.Sprintf(`echo '{"security_and_analysis":{"dependency_graph":{"status":"enabled"}}}' | gh api --method PATCH /repos/%s --input -`, fullName))
+		cmds = append(cmds, fmt.Sprintf(`echo '{"security_and_analysis":{"dependency_graph":{"status":"enabled"}}}' | gh api --method PATCH /repos/%s --input -%s`, fullName, hostSuffix))
 	} else {
-		cmds = append(cmds, fmt.Sprintf(`echo '{"security_and_analysis":{"dependency_graph":{"status":"disabled"}}}' | gh api --method PATCH /repos/%s --input -`, fullName))
+		cmds = append(cmds, fmt.Sprintf(`echo '{"security_and_analysis":{"dependency_graph":{"status":"disabled"}}}' | gh api --method PATCH /repos/%s --input -%s`, fullName, hostSuffix))
 	}
 	if p.DependabotAlerts {
-		cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/vulnerability-alerts", fullName))
+		cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/vulnerability-alerts%s", fullName, hostSuffix))
 	} else {
-		cmds = append(cmds, fmt.Sprintf("gh api --method DELETE /repos/%s/vulnerability-alerts", fullName))
+		cmds = append(cmds, fmt.Sprintf("gh api --method DELETE /repos/%s/vulnerability-alerts%s", fullName, hostSuffix))
 	}
 	if p.DependabotSecurityUpdates {
-		cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/automated-security-fixes", fullName))
+		cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/automated-security-fixes%s", fullName, hostSuffix))
 	} else {
-		cmds = append(cmds, fmt.Sprintf("gh api --method DELETE /repos/%s/automated-security-fixes", fullName))
+		cmds = append(cmds, fmt.Sprintf("gh api --method DELETE /repos/%s/automated-security-fixes%s", fullName, hostSuffix))
 	}
 	return cmds
 }
 
 // PlannedCommands returns the list of commands that would be executed.
-func PlannedCommands(p *policy.DesiredPolicy) []string {
+func PlannedCommands(p *policy.DesiredPolicy, host string) []string {
+	ha := HostArgs(host)
 	var cmds []string
-	cmds = append(cmds, "gh "+strings.Join(CreateRepoArgs(p), " "))
-	cmds = append(cmds, "gh "+strings.Join(EditRepoArgs(p.FullName(), p), " "))
-	cmds = append(cmds, PlannedSecurityCommands(p.FullName(), p)...)
+
+	createArgs := CreateRepoArgs(p)
+	createArgs = append(createArgs, ha...)
+	cmds = append(cmds, "gh "+strings.Join(createArgs, " "))
+
+	editArgs := EditRepoArgs(p.FullName(), p)
+	editArgs = append(editArgs, ha...)
+	cmds = append(cmds, "gh "+strings.Join(editArgs, " "))
+
+	cmds = append(cmds, PlannedSecurityCommands(p.FullName(), p, host)...)
+
 	if p.CloneAfterCreate {
-		cmds = append(cmds, "gh "+strings.Join(CloneRepoArgs(p.FullName(), p.CloneDirectory, p.CloneExtraArgs), " "))
+		cloneArgs := []string{"repo", "clone", p.FullName()}
+		if p.CloneDirectory != "" {
+			cloneArgs = append(cloneArgs, p.CloneDirectory)
+		}
+		cloneArgs = append(cloneArgs, ha...)
+		if len(p.CloneExtraArgs) > 0 {
+			cloneArgs = append(cloneArgs, "--")
+			cloneArgs = append(cloneArgs, p.CloneExtraArgs...)
+		}
+		cmds = append(cmds, "gh "+strings.Join(cloneArgs, " "))
 	}
+
 	return cmds
 }

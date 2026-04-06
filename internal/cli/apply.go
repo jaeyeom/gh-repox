@@ -45,10 +45,12 @@ func newApplyCmd() *cobra.Command {
 			// Dry run
 			if cfg.DryRun.Value {
 				header := fmt.Sprintf("Dry run: gh repox apply %s\n\nWould apply resolved policy to %s", fullName, fullName)
+				editArgs := ghclient.EditRepoArgs(fullName, p)
+				editArgs = append(editArgs, ghclient.HostArgs(cfg.Host.Value)...)
 				cmds := []string{
-					output.FormatCommand("gh", ghclient.EditRepoArgs(fullName, p)...),
+					output.FormatCommand("gh", editArgs...),
 				}
-				cmds = append(cmds, ghclient.PlannedSecurityCommands(fullName, p)...)
+				cmds = append(cmds, ghclient.PlannedSecurityCommands(fullName, p, cfg.Host.Value)...)
 				output.PrintDryRun(os.Stdout, header, cmds)
 				return nil
 			}
