@@ -150,7 +150,7 @@ func TestRepoExists(t *testing.T) {
 func TestRepoExists_NotFound(t *testing.T) {
 	mock := &exec.MockRunner{
 		Responses: []exec.MockCall{
-			{Err: fmt.Errorf("not found")},
+			{Stderr: "GraphQL: Could not resolve to a Repository", Err: fmt.Errorf("exit 1")},
 		},
 	}
 	c := NewClient(mock, "")
@@ -160,6 +160,19 @@ func TestRepoExists_NotFound(t *testing.T) {
 	}
 	if exists {
 		t.Error("should not exist")
+	}
+}
+
+func TestRepoExists_Error(t *testing.T) {
+	mock := &exec.MockRunner{
+		Responses: []exec.MockCall{
+			{Stderr: "authentication required", Err: fmt.Errorf("exit 1")},
+		},
+	}
+	c := NewClient(mock, "")
+	_, err := c.RepoExists(context.Background(), "user/repo")
+	if err == nil {
+		t.Fatal("expected error for auth failure")
 	}
 }
 

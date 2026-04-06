@@ -47,9 +47,13 @@ func (c *Client) GetAuthenticatedUser(ctx context.Context) (string, error) {
 func (c *Client) RepoExists(ctx context.Context, fullName string) (bool, error) {
 	args := []string{"repo", "view", fullName}
 	args = append(args, c.hostArgs()...)
-	_, _, err := c.Runner.Run(ctx, "gh", args...)
+	_, stderr, err := c.Runner.Run(ctx, "gh", args...)
 	if err != nil {
-		return false, nil
+		lower := strings.ToLower(strings.TrimSpace(stderr))
+		if strings.Contains(lower, "not found") || strings.Contains(lower, "could not resolve") {
+			return false, nil
+		}
+		return false, fmt.Errorf("check repo exists: %s: %w", strings.TrimSpace(stderr), err)
 	}
 	return true, nil
 }
@@ -111,6 +115,33 @@ func (c *Client) CreateRepo(ctx context.Context, p *policy.DesiredPolicy) (strin
 func EditRepoArgs(fullName string, p *policy.DesiredPolicy) []string {
 	args := []string{"repo", "edit", fullName}
 
+	// Visibility
+	if p.Private {
+		args = append(args, "--visibility", "private")
+	} else {
+		args = append(args, "--visibility", "public")
+	}
+
+	if p.Description != "" {
+		args = append(args, "--description", p.Description)
+	}
+	if p.Homepage != "" {
+		args = append(args, "--homepage", p.Homepage)
+	}
+
+	// Features
+	if p.HasIssues {
+		args = append(args, "--enable-issues")
+	} else {
+		args = append(args, "--disable-issues")
+	}
+	if p.HasWiki {
+		args = append(args, "--enable-wiki")
+	} else {
+		args = append(args, "--disable-wiki")
+	}
+
+	// Merge settings
 	if p.AllowSquashMerge {
 		args = append(args, "--enable-squash-merge")
 	} else {
@@ -187,6 +218,39 @@ func (c *Client) EnableDependencyGraph(ctx context.Context, fullName string) err
 	return nil
 }
 
+// DisableDependencyGraph disables the dependency graph.
+func (c *Client) DisableDependencyGraph(ctx context.Context, fullName string) error {
+	args := []string{"api", "--method", "DELETE", fmt.Sprintf("/repos/%s/automated-security-fixes", fullName)}
+	args = append(args, c.hostArgs()...)
+	_, stderr, err := c.Runner.Run(ctx, "gh", args...)
+	if err != nil {
+		return fmt.Errorf("could not disable dependency graph: %s: %w", strings.TrimSpace(stderr), err)
+	}
+	return nil
+}
+
+// EnableAutomatedSecurityFixes enables Dependabot security updates.
+func (c *Client) EnableAutomatedSecurityFixes(ctx context.Context, fullName string) error {
+	args := []string{"api", "--method", "PUT", fmt.Sprintf("/repos/%s/automated-security-fixes", fullName)}
+	args = append(args, c.hostArgs()...)
+	_, stderr, err := c.Runner.Run(ctx, "gh", args...)
+	if err != nil {
+		return fmt.Errorf("could not enable Dependabot security updates: %s: %w", strings.TrimSpace(stderr), err)
+	}
+	return nil
+}
+
+// DisableAutomatedSecurityFixes disables Dependabot security updates.
+func (c *Client) DisableAutomatedSecurityFixes(ctx context.Context, fullName string) error {
+	args := []string{"api", "--method", "DELETE", fmt.Sprintf("/repos/%s/automated-security-fixes", fullName)}
+	args = append(args, c.hostArgs()...)
+	_, stderr, err := c.Runner.Run(ctx, "gh", args...)
+	if err != nil {
+		return fmt.Errorf("could not disable Dependabot security updates: %s: %w", strings.TrimSpace(stderr), err)
+	}
+	return nil
+}
+
 // CloneRepoArgs returns the arguments for cloning a repository.
 func CloneRepoArgs(fullName string, dir string, extraArgs []string) []string {
 	args := []string{"repo", "clone", fullName}
@@ -252,7 +316,7 @@ func (c *Client) FetchRepoState(ctx context.Context, fullName string) (*policy.A
 		return nil, fmt.Errorf("failed to parse repo state: %w", err)
 	}
 
-	return &policy.ActualState{
+	state := &policy.ActualState{
 		Private:             rj.IsPrivate,
 		Description:         rj.Description,
 		Homepage:            rj.HomepageURL,
@@ -264,19 +328,124 @@ func (c *Client) FetchRepoState(ctx context.Context, fullName string) (*policy.A
 		AllowRebaseMerge:    rj.RebaseMergeAllowed,
 		AllowAutoMerge:      rj.AutoMergeAllowed,
 		DeleteBranchOnMerge: rj.DeleteBranchOnMerge,
-	}, nil
+	}
+
+	// Fetch security settings via REST API (not available through gh repo view --json).
+	state.DependabotAlerts = c.fetchVulnerabilityAlertsEnabled(ctx, fullName)
+	state.DependencyGraph = c.fetchDependencyGraphEnabled(ctx, fullName)
+	state.DependabotSecurityUpdates = c.fetchAutomatedSecurityFixesEnabled(ctx, fullName)
+
+	return state, nil
+}
+
+// fetchVulnerabilityAlertsEnabled checks if Dependabot alerts are enabled.
+func (c *Client) fetchVulnerabilityAlertsEnabled(ctx context.Context, fullName string) *bool {
+	args := []string{"api", fmt.Sprintf("/repos/%s/vulnerability-alerts", fullName)}
+	args = append(args, c.hostArgs()...)
+	_, _, err := c.Runner.Run(ctx, "gh", args...)
+	enabled := err == nil
+	return &enabled
+}
+
+// fetchDependencyGraphEnabled checks if the dependency graph is enabled.
+func (c *Client) fetchDependencyGraphEnabled(ctx context.Context, fullName string) *bool {
+	args := []string{"api", fmt.Sprintf("/repos/%s", fullName), "--jq", ".source_security_advisories_enabled // false"}
+	args = append(args, c.hostArgs()...)
+	stdout, _, err := c.Runner.Run(ctx, "gh", args...)
+	if err != nil {
+		return nil
+	}
+	enabled := strings.TrimSpace(stdout) == "true"
+	return &enabled
+}
+
+// fetchAutomatedSecurityFixesEnabled checks if Dependabot security updates are enabled.
+func (c *Client) fetchAutomatedSecurityFixesEnabled(ctx context.Context, fullName string) *bool {
+	args := []string{"api", fmt.Sprintf("/repos/%s/automated-security-fixes", fullName)}
+	args = append(args, c.hostArgs()...)
+	stdout, _, err := c.Runner.Run(ctx, "gh", args...)
+	if err != nil {
+		return nil
+	}
+	var result struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+		return nil
+	}
+	return &result.Enabled
 }
 
 // ApplySecuritySettings applies security-related settings.
 func (c *Client) ApplySecuritySettings(ctx context.Context, fullName string, p *policy.DesiredPolicy, _ bool) (applied []string, warnings []string) {
+	// Dependency graph
+	if p.DependencyGraph {
+		if err := c.EnableDependencyGraph(ctx, fullName); err != nil {
+			warnings = append(warnings, err.Error())
+		} else {
+			applied = append(applied, "dependency graph enabled")
+		}
+	} else {
+		if err := c.DisableDependencyGraph(ctx, fullName); err != nil {
+			warnings = append(warnings, err.Error())
+		} else {
+			applied = append(applied, "dependency graph disabled")
+		}
+	}
+
+	// Dependabot alerts
 	if p.DependabotAlerts {
 		if err := c.EnableVulnerabilityAlerts(ctx, fullName); err != nil {
 			warnings = append(warnings, err.Error())
 		} else {
 			applied = append(applied, "Dependabot alerts enabled")
 		}
+	} else {
+		if err := c.DisableVulnerabilityAlerts(ctx, fullName); err != nil {
+			warnings = append(warnings, err.Error())
+		} else {
+			applied = append(applied, "Dependabot alerts disabled")
+		}
 	}
+
+	// Dependabot security updates
+	if p.DependabotSecurityUpdates {
+		if err := c.EnableAutomatedSecurityFixes(ctx, fullName); err != nil {
+			warnings = append(warnings, err.Error())
+		} else {
+			applied = append(applied, "Dependabot security updates enabled")
+		}
+	} else {
+		if err := c.DisableAutomatedSecurityFixes(ctx, fullName); err != nil {
+			warnings = append(warnings, err.Error())
+		} else {
+			applied = append(applied, "Dependabot security updates disabled")
+		}
+	}
+
 	return applied, warnings
+}
+
+// PlannedCommands returns the list of commands that would be executed.
+// PlannedSecurityCommands returns the security-related commands that would be executed.
+func PlannedSecurityCommands(fullName string, p *policy.DesiredPolicy) []string {
+	var cmds []string
+	if p.DependencyGraph {
+		cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/automated-security-fixes", fullName))
+	} else {
+		cmds = append(cmds, fmt.Sprintf("gh api --method DELETE /repos/%s/automated-security-fixes", fullName))
+	}
+	if p.DependabotAlerts {
+		cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/vulnerability-alerts", fullName))
+	} else {
+		cmds = append(cmds, fmt.Sprintf("gh api --method DELETE /repos/%s/vulnerability-alerts", fullName))
+	}
+	if p.DependabotSecurityUpdates {
+		cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/automated-security-fixes", fullName))
+	} else {
+		cmds = append(cmds, fmt.Sprintf("gh api --method DELETE /repos/%s/automated-security-fixes", fullName))
+	}
+	return cmds
 }
 
 // PlannedCommands returns the list of commands that would be executed.
@@ -284,9 +453,7 @@ func PlannedCommands(p *policy.DesiredPolicy) []string {
 	var cmds []string
 	cmds = append(cmds, "gh "+strings.Join(CreateRepoArgs(p), " "))
 	cmds = append(cmds, "gh "+strings.Join(EditRepoArgs(p.FullName(), p), " "))
-	if p.DependabotAlerts {
-		cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/vulnerability-alerts", p.FullName()))
-	}
+	cmds = append(cmds, PlannedSecurityCommands(p.FullName(), p)...)
 	if p.CloneAfterCreate {
 		cmds = append(cmds, "gh "+strings.Join(CloneRepoArgs(p.FullName(), p.CloneDirectory, p.CloneExtraArgs), " "))
 	}

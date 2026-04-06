@@ -48,9 +48,7 @@ func newApplyCmd() *cobra.Command {
 				cmds := []string{
 					output.FormatCommand("gh", ghclient.EditRepoArgs(fullName, p)...),
 				}
-				if p.DependabotAlerts {
-					cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/vulnerability-alerts", fullName))
-				}
+				cmds = append(cmds, ghclient.PlannedSecurityCommands(fullName, p)...)
 				output.PrintDryRun(os.Stdout, header, cmds)
 				return nil
 			}
@@ -76,7 +74,16 @@ func newApplyCmd() *cobra.Command {
 				}
 				result.Warnings = append(result.Warnings, err.Error())
 			} else {
+				visibility := "public"
+				if p.Private {
+					visibility = "private"
+				}
 				result.Applied = append(result.Applied,
+					"visibility: "+visibility,
+					"description: "+p.Description,
+					"homepage: "+p.Homepage,
+					"issues: "+enabledStr(p.HasIssues),
+					"wiki: "+enabledStr(p.HasWiki),
 					"squash merge: "+enabledStr(p.AllowSquashMerge),
 					"merge commits: "+enabledStr(p.AllowMergeCommit),
 					"rebase merge: "+enabledStr(p.AllowRebaseMerge),
