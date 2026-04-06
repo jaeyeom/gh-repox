@@ -405,13 +405,16 @@ gh repox config explain --org myorg
 
 ### Build
 
-Build the binary:
+Build the binary for local development:
 
 ```bash
 make build
 ```
 
-The compiled binary will be in the current directory as `gh-repox`.
+This produces a local `gh-repox` binary for testing during development. This
+binary is git-ignored and is **not** the artifact used for public installation.
+Public users install precompiled binaries attached to GitHub releases (see
+[Releasing](#releasing)).
 
 ### Test
 
@@ -475,6 +478,21 @@ gh repox --help
 
 ## Releasing
 
+### Release-readiness check
+
+Before tagging a release, verify that the project cross-compiles for all
+supported platforms:
+
+```bash
+make release-check
+```
+
+This builds binaries for macOS (amd64/arm64), Linux (amd64/arm64), and Windows
+(amd64) into the `dist/` directory — the same platforms targeted by the release
+workflow. If any platform fails to compile, fix the issue before publishing.
+
+### Publishing a release
+
 To publish a new release, push a version tag:
 
 ```bash
@@ -483,14 +501,24 @@ git push origin v0.1.0
 ```
 
 The [release workflow](.github/workflows/release.yml) automatically
-cross-compiles binaries for macOS (amd64/arm64), Linux (amd64/arm64), and
-Windows (amd64), then attaches them to the GitHub release. Once published,
+cross-compiles binaries and attaches them to the GitHub release. Once published,
 users can install or upgrade with:
 
 ```bash
 gh extension install jaeyeom/gh-repox
 gh extension upgrade jaeyeom/gh-repox
 ```
+
+### Local builds vs public installation
+
+| Path | Artifact | Purpose |
+|------|----------|---------|
+| `make build` | `./gh-repox` (git-ignored) | Local development and testing only |
+| `make release-check` | `dist/*` (git-ignored) | Verify cross-compilation before tagging |
+| `git push origin v*` | GitHub release binaries | Public installation via `gh extension install` |
+
+A successful `make build` does **not** guarantee that the repository is publicly
+installable. Always run `make release-check` before publishing a new tag.
 
 ## Architecture
 

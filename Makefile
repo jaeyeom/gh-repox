@@ -17,9 +17,9 @@ check: check-format lint test build
 
 # ── Build ───────────────────────────────────────────────────────────
 
-.PHONY: build clean install
+.PHONY: build clean install release-check
 
-## build: compile the CLI binary
+## build: compile the CLI binary (local development only)
 build:
 	go build $(GOFLAGS) -o $(BINARY) ./cmd/gh-repox
 
@@ -27,9 +27,22 @@ build:
 install:
 	go install $(GOFLAGS) ./cmd/gh-repox
 
+## release-check: cross-compile for all release platforms to verify release readiness
+release-check:
+	@echo "Verifying cross-compilation for all release platforms..."
+	@for platform in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64; do \
+		os=$${platform%/*}; \
+		arch=$${platform#*/}; \
+		output="dist/gh-repox-$${os}-$${arch}"; \
+		if [ "$$os" = "windows" ]; then output="$${output}.exe"; fi; \
+		echo "  Building $${os}/$${arch}..."; \
+		GOOS=$$os GOARCH=$$arch go build $(GOFLAGS) -o "$$output" ./cmd/gh-repox || exit 1; \
+	done
+	@echo "All platforms built successfully in dist/"
+
 ## clean: remove build artifacts and coverage files
 clean:
-	rm -f $(BINARY) coverage.out coverage.html
+	rm -rf $(BINARY) dist coverage.out coverage.html
 
 # ── Format ──────────────────────────────────────────────────────────
 
