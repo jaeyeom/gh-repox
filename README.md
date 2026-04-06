@@ -473,6 +473,25 @@ Then use it as a GitHub CLI extension:
 gh repox --help
 ```
 
+## Releasing
+
+To publish a new release, push a version tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The [release workflow](.github/workflows/release.yml) automatically
+cross-compiles binaries for macOS (amd64/arm64), Linux (amd64/arm64), and
+Windows (amd64), then attaches them to the GitHub release. Once published,
+users can install or upgrade with:
+
+```bash
+gh extension install jaeyeom/gh-repox
+gh extension upgrade jaeyeom/gh-repox
+```
+
 ## Architecture
 
 gh-repox is organized into focused packages:
