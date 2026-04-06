@@ -47,7 +47,7 @@ func newCreateCmd() *cobra.Command {
 
 			cfg, err := resolveConfig()
 			if err != nil {
-				return fmt.Errorf("config error: %w", err)
+				return exitErrorf(ExitInvalidInput, "config error: %w", err)
 			}
 
 			// Apply create-specific flags
@@ -59,7 +59,7 @@ func newCreateCmd() *cobra.Command {
 
 			// Resolve owner
 			if err := resolveOwner(ctx, cfg); err != nil {
-				return err
+				return exitErrorf(ExitNoAuth, "%s", err)
 			}
 
 			// Build policy
@@ -67,7 +67,7 @@ func newCreateCmd() *cobra.Command {
 
 			// Validate
 			if err := validate.Create(p); err != nil {
-				return fmt.Errorf("validate create: %w", err)
+				return exitErrorf(ExitInvalidInput, "validate create: %w", err)
 			}
 
 			runner := &exec.RealRunner{}
@@ -199,7 +199,7 @@ func executeCreate(ctx context.Context, client *ghclient.Client, cfg *config.Con
 
 	url, err := client.CreateRepo(ctx, p)
 	if err != nil {
-		return fmt.Errorf("create repo: %w", err)
+		return exitErrorf(ExitCreateFailed, "create repo: %w", err)
 	}
 
 	result := &output.CreateResult{
@@ -214,14 +214,25 @@ func executeCreate(ctx context.Context, client *ghclient.Client, cfg *config.Con
 
 	if err := client.EditRepo(ctx, p.FullName(), p); err != nil {
 		if cfg.Strict.Value {
-			return fmt.Errorf("edit repo: %w", err)
+			return exitErrorf(ExitStrictFailed, "edit repo: %w", err)
 		}
 		result.Warnings = append(result.Warnings, err.Error())
 	}
 
 	secApplied, secWarnings := client.ApplySecuritySettings(ctx, p.FullName(), p, cfg.Strict.Value)
-	_ = secApplied
+	for _, s := range secApplied {
+		result.Applied[s] = true
+	}
 	result.Warnings = append(result.Warnings, secWarnings...)
+
+	if cfg.Strict.Value && len(result.Warnings) > 0 {
+		if flagJSON {
+			_ = output.PrintJSON(os.Stdout, result)
+		} else {
+			output.PrintCreateHuman(os.Stdout, result)
+		}
+		return exitErrorf(ExitStrictFailed, "strict mode: %d warning(s)", len(result.Warnings))
+	}
 
 	if err := handleClone(ctx, client, cfg, p, result); err != nil {
 		return err
@@ -249,7 +260,7 @@ func handleClone(ctx context.Context, client *ghclient.Client, cfg *config.Confi
 	if err := client.CloneRepo(ctx, p.FullName(), p.CloneDirectory, p.CloneExtraArgs); err != nil {
 		result.Clone.Completed = false
 		if cfg.Strict.Value {
-			return fmt.Errorf("clone repo: %w", err)
+			return exitErrorf(ExitCloneFailed, "clone repo: %w", err)
 		}
 		result.Warnings = append(result.Warnings, err.Error())
 	} else {

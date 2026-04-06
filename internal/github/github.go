@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/jaeyeom/gh-repox/internal/exec"
@@ -207,24 +208,42 @@ func (c *Client) DisableVulnerabilityAlerts(ctx context.Context, fullName string
 	return nil
 }
 
-// EnableDependencyGraph enables the dependency graph.
-func (c *Client) EnableDependencyGraph(ctx context.Context, fullName string) error {
-	args := []string{"api", "--method", "PUT", fmt.Sprintf("/repos/%s/automated-security-fixes", fullName)}
+// patchSecurityAnalysis sends a PATCH to /repos/{repo} with a security_and_analysis body.
+func (c *Client) patchSecurityAnalysis(ctx context.Context, fullName string, body string) error {
+	tmpFile, err := os.CreateTemp("", "gh-repox-*.json")
+	if err != nil {
+		return fmt.Errorf("create temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	if _, err := tmpFile.WriteString(body); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("write temp file: %w", err)
+	}
+	tmpFile.Close()
+
+	args := []string{"api", "--method", "PATCH", fmt.Sprintf("/repos/%s", fullName), "--input", tmpFile.Name()}
 	args = append(args, c.hostArgs()...)
 	_, stderr, err := c.Runner.Run(ctx, "gh", args...)
 	if err != nil {
-		return fmt.Errorf("could not enable dependency graph: %s: %w", strings.TrimSpace(stderr), err)
+		return fmt.Errorf("PATCH security_and_analysis: %s: %w", strings.TrimSpace(stderr), err)
 	}
 	return nil
 }
 
-// DisableDependencyGraph disables the dependency graph.
+// EnableDependencyGraph enables the dependency graph via the security_and_analysis API.
+func (c *Client) EnableDependencyGraph(ctx context.Context, fullName string) error {
+	body := `{"security_and_analysis":{"dependency_graph":{"status":"enabled"}}}`
+	if err := c.patchSecurityAnalysis(ctx, fullName, body); err != nil {
+		return fmt.Errorf("could not enable dependency graph: %w", err)
+	}
+	return nil
+}
+
+// DisableDependencyGraph disables the dependency graph via the security_and_analysis API.
 func (c *Client) DisableDependencyGraph(ctx context.Context, fullName string) error {
-	args := []string{"api", "--method", "DELETE", fmt.Sprintf("/repos/%s/automated-security-fixes", fullName)}
-	args = append(args, c.hostArgs()...)
-	_, stderr, err := c.Runner.Run(ctx, "gh", args...)
-	if err != nil {
-		return fmt.Errorf("could not disable dependency graph: %s: %w", strings.TrimSpace(stderr), err)
+	body := `{"security_and_analysis":{"dependency_graph":{"status":"disabled"}}}`
+	if err := c.patchSecurityAnalysis(ctx, fullName, body); err != nil {
+		return fmt.Errorf("could not disable dependency graph: %w", err)
 	}
 	return nil
 }
@@ -339,23 +358,37 @@ func (c *Client) FetchRepoState(ctx context.Context, fullName string) (*policy.A
 }
 
 // fetchVulnerabilityAlertsEnabled checks if Dependabot alerts are enabled.
+// The /vulnerability-alerts endpoint returns 204 if enabled, 404 if disabled.
+// On other errors (permissions, network), returns nil to indicate unknown.
 func (c *Client) fetchVulnerabilityAlertsEnabled(ctx context.Context, fullName string) *bool {
 	args := []string{"api", fmt.Sprintf("/repos/%s/vulnerability-alerts", fullName)}
 	args = append(args, c.hostArgs()...)
-	_, _, err := c.Runner.Run(ctx, "gh", args...)
-	enabled := err == nil
+	_, stderr, err := c.Runner.Run(ctx, "gh", args...)
+	if err != nil {
+		// 404 means alerts are disabled; other errors are unknown.
+		if strings.Contains(strings.ToLower(strings.TrimSpace(stderr)), "not found") {
+			enabled := false
+			return &enabled
+		}
+		return nil
+	}
+	enabled := true
 	return &enabled
 }
 
 // fetchDependencyGraphEnabled checks if the dependency graph is enabled.
 func (c *Client) fetchDependencyGraphEnabled(ctx context.Context, fullName string) *bool {
-	args := []string{"api", fmt.Sprintf("/repos/%s", fullName), "--jq", ".source_security_advisories_enabled // false"}
+	args := []string{"api", fmt.Sprintf("/repos/%s", fullName), "--jq", ".security_and_analysis.dependency_graph.status"}
 	args = append(args, c.hostArgs()...)
 	stdout, _, err := c.Runner.Run(ctx, "gh", args...)
 	if err != nil {
 		return nil
 	}
-	enabled := strings.TrimSpace(stdout) == "true"
+	status := strings.TrimSpace(stdout)
+	if status == "" {
+		return nil
+	}
+	enabled := status == "enabled"
 	return &enabled
 }
 
@@ -431,9 +464,9 @@ func (c *Client) ApplySecuritySettings(ctx context.Context, fullName string, p *
 func PlannedSecurityCommands(fullName string, p *policy.DesiredPolicy) []string {
 	var cmds []string
 	if p.DependencyGraph {
-		cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/automated-security-fixes", fullName))
+		cmds = append(cmds, fmt.Sprintf(`gh api --method PATCH /repos/%s --input <{"security_and_analysis":{"dependency_graph":{"status":"enabled"}}}>`, fullName))
 	} else {
-		cmds = append(cmds, fmt.Sprintf("gh api --method DELETE /repos/%s/automated-security-fixes", fullName))
+		cmds = append(cmds, fmt.Sprintf(`gh api --method PATCH /repos/%s --input <{"security_and_analysis":{"dependency_graph":{"status":"disabled"}}}>`, fullName))
 	}
 	if p.DependabotAlerts {
 		cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/vulnerability-alerts", fullName))

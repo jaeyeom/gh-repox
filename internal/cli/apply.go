@@ -24,15 +24,15 @@ func newApplyCmd() *cobra.Command {
 
 			owner, repo, err := validate.ParseOwnerRepo(args[0])
 			if err != nil {
-				return fmt.Errorf("parse repo: %w", err)
+				return exitErrorf(ExitInvalidInput, "parse repo: %w", err)
 			}
 			if err := validate.Apply(owner, repo); err != nil {
-				return fmt.Errorf("validate apply: %w", err)
+				return exitErrorf(ExitInvalidInput, "validate apply: %w", err)
 			}
 
 			cfg, err := resolveConfig()
 			if err != nil {
-				return fmt.Errorf("config error: %w", err)
+				return exitErrorf(ExitInvalidInput, "config error: %w", err)
 			}
 
 			p := policy.FromConfig(cfg, repo)
@@ -70,7 +70,7 @@ func newApplyCmd() *cobra.Command {
 			// Apply settings
 			if err := client.EditRepo(ctx, fullName, p); err != nil {
 				if cfg.Strict.Value {
-					return fmt.Errorf("edit repo: %w", err)
+					return exitErrorf(ExitStrictFailed, "edit repo: %w", err)
 				}
 				result.Warnings = append(result.Warnings, err.Error())
 			} else {
@@ -104,7 +104,7 @@ func newApplyCmd() *cobra.Command {
 				} else {
 					output.PrintApplyHuman(os.Stdout, result)
 				}
-				return fmt.Errorf("strict mode: %d warning(s)", len(result.Warnings))
+				return exitErrorf(ExitStrictFailed, "strict mode: %d warning(s)", len(result.Warnings))
 			}
 
 			if flagJSON {
