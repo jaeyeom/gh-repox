@@ -464,9 +464,9 @@ func (c *Client) ApplySecuritySettings(ctx context.Context, fullName string, p *
 func PlannedSecurityCommands(fullName string, p *policy.DesiredPolicy) []string {
 	var cmds []string
 	if p.DependencyGraph {
-		cmds = append(cmds, fmt.Sprintf(`gh api --method PATCH /repos/%s --input <{"security_and_analysis":{"dependency_graph":{"status":"enabled"}}}>`, fullName))
+		cmds = append(cmds, fmt.Sprintf(`echo '{"security_and_analysis":{"dependency_graph":{"status":"enabled"}}}' | gh api --method PATCH /repos/%s --input -`, fullName))
 	} else {
-		cmds = append(cmds, fmt.Sprintf(`gh api --method PATCH /repos/%s --input <{"security_and_analysis":{"dependency_graph":{"status":"disabled"}}}>`, fullName))
+		cmds = append(cmds, fmt.Sprintf(`echo '{"security_and_analysis":{"dependency_graph":{"status":"disabled"}}}' | gh api --method PATCH /repos/%s --input -`, fullName))
 	}
 	if p.DependabotAlerts {
 		cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/vulnerability-alerts", fullName))

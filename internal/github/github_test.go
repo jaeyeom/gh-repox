@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/jaeyeom/gh-repox/internal/exec"
@@ -188,6 +189,71 @@ func TestPlannedCommands(t *testing.T) {
 	cmds := PlannedCommands(p)
 	if len(cmds) < 3 {
 		t.Errorf("expected at least 3 commands, got %d", len(cmds))
+	}
+}
+
+func TestPlannedSecurityCommands(t *testing.T) {
+	tests := []struct {
+		name            string
+		policy          *policy.DesiredPolicy
+		wantSubstrings  []string
+		wantNoSubstring []string
+	}{
+		{
+			name: "all enabled",
+			policy: &policy.DesiredPolicy{
+				DependencyGraph:           true,
+				DependabotAlerts:          true,
+				DependabotSecurityUpdates: true,
+			},
+			wantSubstrings: []string{
+				`echo '{"security_and_analysis":{"dependency_graph":{"status":"enabled"}}}' | gh api --method PATCH /repos/owner/repo --input -`,
+				"gh api --method PUT /repos/owner/repo/vulnerability-alerts",
+				"gh api --method PUT /repos/owner/repo/automated-security-fixes",
+			},
+		},
+		{
+			name: "all disabled",
+			policy: &policy.DesiredPolicy{
+				DependencyGraph:           false,
+				DependabotAlerts:          false,
+				DependabotSecurityUpdates: false,
+			},
+			wantSubstrings: []string{
+				`echo '{"security_and_analysis":{"dependency_graph":{"status":"disabled"}}}' | gh api --method PATCH /repos/owner/repo --input -`,
+				"gh api --method DELETE /repos/owner/repo/vulnerability-alerts",
+				"gh api --method DELETE /repos/owner/repo/automated-security-fixes",
+			},
+		},
+		{
+			name: "commands are valid shell invocations",
+			policy: &policy.DesiredPolicy{
+				DependencyGraph: true,
+			},
+			wantNoSubstring: []string{
+				"--input <{",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmds := PlannedSecurityCommands("owner/repo", tt.policy)
+			if len(cmds) != 3 {
+				t.Fatalf("expected 3 commands, got %d", len(cmds))
+			}
+			joined := strings.Join(cmds, "\n")
+			for _, want := range tt.wantSubstrings {
+				if !strings.Contains(joined, want) {
+					t.Errorf("expected command output to contain %q, got:\n%s", want, joined)
+				}
+			}
+			for _, noWant := range tt.wantNoSubstring {
+				if strings.Contains(joined, noWant) {
+					t.Errorf("command output should not contain %q, got:\n%s", noWant, joined)
+				}
+			}
+		})
 	}
 }
 
