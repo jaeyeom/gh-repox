@@ -98,16 +98,86 @@ func TestCreateRepoArgs_Template(t *testing.T) {
 }
 
 func TestEditRepoArgs(t *testing.T) {
-	p := &policy.DesiredPolicy{
-		AllowSquashMerge:    true,
-		AllowMergeCommit:    false,
-		AllowRebaseMerge:    false,
-		AllowAutoMerge:      true,
-		DeleteBranchOnMerge: true,
+	tests := []struct {
+		name     string
+		policy   *policy.DesiredPolicy
+		wantArgs []string
+	}{
+		{
+			name: "features enabled",
+			policy: &policy.DesiredPolicy{
+				Owner:               "user",
+				Repo:                "repo",
+				Private:             true,
+				HasIssues:           true,
+				HasWiki:             true,
+				AllowSquashMerge:    true,
+				AllowMergeCommit:    true,
+				AllowRebaseMerge:    true,
+				AllowAutoMerge:      true,
+				DeleteBranchOnMerge: true,
+				HasProjects:         true,
+			},
+			wantArgs: []string{
+				"--enable-issues=true",
+				"--enable-wiki=true",
+				"--enable-squash-merge=true",
+				"--enable-merge-commit=true",
+				"--enable-rebase-merge=true",
+				"--enable-auto-merge=true",
+				"--delete-branch-on-merge=true",
+				"--enable-projects=true",
+				"--visibility", "private",
+			},
+		},
+		{
+			name: "features disabled",
+			policy: &policy.DesiredPolicy{
+				Owner:               "user",
+				Repo:                "repo",
+				Private:             false,
+				HasIssues:           false,
+				HasWiki:             false,
+				AllowSquashMerge:    false,
+				AllowMergeCommit:    false,
+				AllowRebaseMerge:    false,
+				AllowAutoMerge:      false,
+				DeleteBranchOnMerge: false,
+				HasProjects:         false,
+			},
+			wantArgs: []string{
+				"--enable-issues=false",
+				"--enable-wiki=false",
+				"--enable-squash-merge=false",
+				"--enable-merge-commit=false",
+				"--enable-rebase-merge=false",
+				"--enable-auto-merge=false",
+				"--delete-branch-on-merge=false",
+				"--enable-projects=false",
+				"--visibility", "public",
+			},
+		},
 	}
-	args := EditRepoArgs("user/repo", p)
-	if args[0] != "repo" || args[1] != "edit" || args[2] != "user/repo" {
-		t.Errorf("unexpected prefix: %v", args)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := EditRepoArgs("user/repo", tt.policy)
+			if args[0] != "repo" || args[1] != "edit" || args[2] != "user/repo" {
+				t.Fatalf("unexpected prefix: %v", args)
+			}
+			joined := strings.Join(args, " ")
+			for _, want := range tt.wantArgs {
+				if !strings.Contains(joined, want) {
+					t.Errorf("expected args to contain %q, got:\n%s", want, joined)
+				}
+			}
+			// Verify no invalid --disable-* flags are present.
+			for _, a := range args {
+				if strings.HasPrefix(a, "--disable-") {
+					t.Errorf("found invalid flag %q; gh repo edit only supports --enable-*=false", a)
+				}
+			}
+		})
 	}
 }
 

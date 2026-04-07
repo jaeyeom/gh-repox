@@ -132,45 +132,17 @@ func EditRepoArgs(fullName string, p *policy.DesiredPolicy) []string {
 	args = append(args, "--description", p.Description)
 	args = append(args, "--homepage", p.Homepage)
 
-	// Features
-	if p.HasIssues {
-		args = append(args, "--enable-issues")
-	} else {
-		args = append(args, "--disable-issues")
-	}
-	if p.HasWiki {
-		args = append(args, "--enable-wiki")
-	} else {
-		args = append(args, "--disable-wiki")
-	}
+	// Features — gh repo edit only has --enable-* flags; disable with =false.
+	args = append(args, fmt.Sprintf("--enable-issues=%t", p.HasIssues))
+	args = append(args, fmt.Sprintf("--enable-wiki=%t", p.HasWiki))
 
 	// Merge settings
-	if p.AllowSquashMerge {
-		args = append(args, "--enable-squash-merge")
-	} else {
-		args = append(args, "--disable-squash-merge")
-	}
-	if p.AllowMergeCommit {
-		args = append(args, "--enable-merge-commit")
-	} else {
-		args = append(args, "--disable-merge-commit")
-	}
-	if p.AllowRebaseMerge {
-		args = append(args, "--enable-rebase-merge")
-	} else {
-		args = append(args, "--disable-rebase-merge")
-	}
-	if p.AllowAutoMerge {
-		args = append(args, "--enable-auto-merge")
-	} else {
-		args = append(args, "--disable-auto-merge")
-	}
+	args = append(args, fmt.Sprintf("--enable-squash-merge=%t", p.AllowSquashMerge))
+	args = append(args, fmt.Sprintf("--enable-merge-commit=%t", p.AllowMergeCommit))
+	args = append(args, fmt.Sprintf("--enable-rebase-merge=%t", p.AllowRebaseMerge))
+	args = append(args, fmt.Sprintf("--enable-auto-merge=%t", p.AllowAutoMerge))
 	args = append(args, fmt.Sprintf("--delete-branch-on-merge=%t", p.DeleteBranchOnMerge))
-	if p.HasProjects {
-		args = append(args, "--enable-projects")
-	} else {
-		args = append(args, "--disable-projects")
-	}
+	args = append(args, fmt.Sprintf("--enable-projects=%t", p.HasProjects))
 
 	return args
 }

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -33,7 +34,9 @@ func newConfigShowCmd() *cobra.Command {
 
 			// Resolve owner for display
 			if cfg.Owner.Value == "" && cfg.Org.Value == "" {
-				_ = resolveOwner(context.Background(), cfg)
+				if err := resolveOwner(context.Background(), cfg); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: could not resolve owner: %v\n", err)
+				}
 			}
 
 			entries := cfg.Entries()
@@ -62,7 +65,9 @@ func newConfigExplainCmd() *cobra.Command {
 
 			// Resolve owner for display
 			if cfg.Owner.Value == "" && cfg.Org.Value == "" {
-				_ = resolveOwner(context.Background(), cfg)
+				if err := resolveOwner(context.Background(), cfg); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: could not resolve owner: %v\n", err)
+				}
 			}
 
 			entries := cfg.Entries()
