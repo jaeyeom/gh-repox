@@ -29,7 +29,7 @@ func newConfigShowCmd() *cobra.Command {
 		RunE: func(_ *cobra.Command, _ []string) error {
 			cfg, err := resolveConfig()
 			if err != nil {
-				return err
+				return exitErrorf(ExitInvalidInput, "config error: %w", err)
 			}
 
 			// Resolve owner for display
@@ -60,7 +60,7 @@ func newConfigExplainCmd() *cobra.Command {
 		RunE: func(_ *cobra.Command, _ []string) error {
 			cfg, err := resolveConfig()
 			if err != nil {
-				return err
+				return exitErrorf(ExitInvalidInput, "config error: %w", err)
 			}
 
 			// Resolve owner for display

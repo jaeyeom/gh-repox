@@ -75,6 +75,9 @@ func newCreateCmd() *cobra.Command {
 
 			// Dry run
 			if cfg.DryRun.Value {
+				if flagJSON {
+					return printCreateDryRunJSON(repoName, p, cfg)
+				}
 				printCreateDryRun(repoName, p, cfg)
 				return nil
 			}
@@ -181,6 +184,20 @@ func applyCreateInitFlags(
 	}
 }
 
+func printCreateDryRunJSON(_ string, p *policy.DesiredPolicy, cfg *config.Config) error {
+	cmds := ghclient.PlannedCommands(p, cfg.Host.Value)
+	result := &output.DryRunResult{
+		Command:  "create",
+		DryRun:   true,
+		Repo:     p.FullName(),
+		Commands: cmds,
+	}
+	if err := output.PrintJSON(os.Stdout, result); err != nil {
+		return fmt.Errorf("print JSON: %w", err)
+	}
+	return nil
+}
+
 func printCreateDryRun(repoName string, p *policy.DesiredPolicy, cfg *config.Config) {
 	header := fmt.Sprintf("Dry run: gh repox create %s\n\nResolved target:\n- repo: %s\n- owner source: %s\n- visibility: %s\n- init: %s\n- clone after create: %v",
 		repoName, p.FullName(), cfg.Owner.Source, visibilityStr(p.Private), initStr(p), p.CloneAfterCreate)
@@ -194,7 +211,7 @@ func executeCreate(ctx context.Context, client *ghclient.Client, cfg *config.Con
 		return fmt.Errorf("check repo exists: %w", err)
 	}
 	if exists {
-		return fmt.Errorf("repository %s already exists", p.FullName())
+		return exitErrorf(ExitInvalidInput, "repository %s already exists", p.FullName())
 	}
 
 	url, err := client.CreateRepo(ctx, p)
@@ -208,7 +225,7 @@ func executeCreate(ctx context.Context, client *ghclient.Client, cfg *config.Con
 		URL:         url,
 		Created:     true,
 		OwnerSource: string(cfg.Owner.Source),
-		Applied:     buildAppliedMap(p),
+		Applied:     map[string]any{},
 		Warnings:    []string{},
 	}
 
@@ -217,6 +234,8 @@ func executeCreate(ctx context.Context, client *ghclient.Client, cfg *config.Con
 			return exitErrorf(ExitStrictFailed, "edit repo: %w", err)
 		}
 		result.Warnings = append(result.Warnings, err.Error())
+	} else {
+		result.Applied = buildAppliedMap(p)
 	}
 
 	secApplied, secWarnings := client.ApplySecuritySettings(ctx, p.FullName(), p, cfg.Strict.Value)

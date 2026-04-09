@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/jaeyeom/gh-repox/internal/config"
 	"github.com/jaeyeom/gh-repox/internal/exec"
 	ghclient "github.com/jaeyeom/gh-repox/internal/github"
 	"github.com/jaeyeom/gh-repox/internal/output"
@@ -44,15 +45,7 @@ func newApplyCmd() *cobra.Command {
 
 			// Dry run
 			if cfg.DryRun.Value {
-				header := fmt.Sprintf("Dry run: gh repox apply %s\n\nWould apply resolved policy to %s", fullName, fullName)
-				editArgs := ghclient.EditRepoArgs(fullName, p)
-				editArgs = append(editArgs, ghclient.HostArgs(cfg.Host.Value)...)
-				cmds := []string{
-					output.FormatCommand("gh", editArgs...),
-				}
-				cmds = append(cmds, ghclient.PlannedSecurityCommands(fullName, p, cfg.Host.Value)...)
-				output.PrintDryRun(os.Stdout, header, cmds)
-				return nil
+				return printApplyDryRun(fullName, p, cfg)
 			}
 
 			// Check repo exists
@@ -61,7 +54,7 @@ func newApplyCmd() *cobra.Command {
 				return fmt.Errorf("check repo exists: %w", err)
 			}
 			if !exists {
-				return fmt.Errorf("repository %s does not exist", fullName)
+				return exitErrorf(ExitInvalidInput, "repository %s does not exist", fullName)
 			}
 
 			result := &output.ApplyResult{
@@ -117,6 +110,30 @@ func newApplyCmd() *cobra.Command {
 		},
 	}
 	return cmd
+}
+
+func printApplyDryRun(fullName string, p *policy.DesiredPolicy, cfg *config.Config) error {
+	editArgs := ghclient.EditRepoArgs(fullName, p)
+	editArgs = append(editArgs, ghclient.HostArgs(cfg.Host.Value)...)
+	cmds := []string{
+		output.FormatCommand("gh", editArgs...),
+	}
+	cmds = append(cmds, ghclient.PlannedSecurityCommands(fullName, p, cfg.Host.Value)...)
+	if flagJSON {
+		result := &output.DryRunResult{
+			Command:  "apply",
+			DryRun:   true,
+			Repo:     fullName,
+			Commands: cmds,
+		}
+		if err := output.PrintJSON(os.Stdout, result); err != nil {
+			return fmt.Errorf("print JSON: %w", err)
+		}
+		return nil
+	}
+	header := fmt.Sprintf("Dry run: gh repox apply %s\n\nWould apply resolved policy to %s", fullName, fullName)
+	output.PrintDryRun(os.Stdout, header, cmds)
+	return nil
 }
 
 func enabledStr(b bool) string {

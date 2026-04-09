@@ -117,6 +117,14 @@ func PrintConfigExplain(w io.Writer, entries []config.Entry) {
 	}
 }
 
+// DryRunResult holds the result of a dry-run operation for JSON output.
+type DryRunResult struct {
+	Command  string   `json:"command"`
+	DryRun   bool     `json:"dryRun"`
+	Repo     string   `json:"repo"`
+	Commands []string `json:"commands"`
+}
+
 // PrintDryRun prints planned commands.
 func PrintDryRun(w io.Writer, header string, commands []string) {
 	fmt.Fprintln(w, header)

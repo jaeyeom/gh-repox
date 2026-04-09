@@ -25,12 +25,12 @@ func newDiffCmd() *cobra.Command {
 
 			owner, repo, err := validate.ParseOwnerRepo(args[0])
 			if err != nil {
-				return fmt.Errorf("parse repo: %w", err)
+				return exitErrorf(ExitInvalidInput, "parse repo: %w", err)
 			}
 
 			cfg, err := resolveConfig()
 			if err != nil {
-				return fmt.Errorf("config error: %w", err)
+				return exitErrorf(ExitInvalidInput, "config error: %w", err)
 			}
 
 			p := policy.FromConfig(cfg, repo)
