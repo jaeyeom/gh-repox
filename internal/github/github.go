@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jaeyeom/gh-repox/internal/exec"
+	"github.com/jaeyeom/gh-repox/internal/output"
 	"github.com/jaeyeom/gh-repox/internal/policy"
 )
 
@@ -471,11 +472,11 @@ func PlannedCommands(p *policy.DesiredPolicy, host string) []string {
 
 	createArgs := CreateRepoArgs(p)
 	createArgs = append(createArgs, ha...)
-	cmds = append(cmds, "gh "+strings.Join(createArgs, " "))
+	cmds = append(cmds, output.FormatCommand("gh", createArgs...))
 
 	editArgs := EditRepoArgs(p.FullName(), p)
 	editArgs = append(editArgs, ha...)
-	cmds = append(cmds, "gh "+strings.Join(editArgs, " "))
+	cmds = append(cmds, output.FormatCommand("gh", editArgs...))
 
 	cmds = append(cmds, PlannedSecurityCommands(p.FullName(), p, host)...)
 
@@ -489,7 +490,7 @@ func PlannedCommands(p *policy.DesiredPolicy, host string) []string {
 			cloneArgs = append(cloneArgs, "--")
 			cloneArgs = append(cloneArgs, p.CloneExtraArgs...)
 		}
-		cmds = append(cmds, "gh "+strings.Join(cloneArgs, " "))
+		cmds = append(cmds, output.FormatCommand("gh", cloneArgs...))
 	}
 
 	return cmds

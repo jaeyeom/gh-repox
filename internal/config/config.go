@@ -72,7 +72,6 @@ type Config struct {
 
 	// Behavior settings
 	DryRun   Field[bool]
-	Verbose  Field[bool]
 	Strict   Field[bool]
 	OpenRepo Field[bool]
 }
@@ -115,7 +114,6 @@ type yamlConfig struct {
 	} `yaml:"clone"`
 	Behavior struct {
 		DryRun   *bool `yaml:"dry_run"`
-		Verbose  *bool `yaml:"verbose"`
 		Strict   *bool `yaml:"strict"`
 		OpenRepo *bool `yaml:"open_repo"`
 	} `yaml:"behavior"`
@@ -155,7 +153,6 @@ func Defaults() *Config {
 	c.CloneExtraArgs.Set(nil, SourceDefault)
 
 	c.DryRun.Set(false, SourceDefault)
-	c.Verbose.Set(false, SourceDefault)
 	c.Strict.Set(false, SourceDefault)
 	c.OpenRepo.Set(false, SourceDefault)
 
@@ -296,9 +293,6 @@ func (c *Config) applyBehavior(yc yamlConfig) {
 	if yc.Behavior.DryRun != nil {
 		c.DryRun.Set(*yc.Behavior.DryRun, SourceConfig)
 	}
-	if yc.Behavior.Verbose != nil {
-		c.Verbose.Set(*yc.Behavior.Verbose, SourceConfig)
-	}
 	if yc.Behavior.Strict != nil {
 		c.Strict.Set(*yc.Behavior.Strict, SourceConfig)
 	}
@@ -321,11 +315,6 @@ func (c *Config) LoadEnv() {
 	if v := os.Getenv("REPOX_PRIVATE"); v != "" {
 		if b, err := strconv.ParseBool(v); err == nil {
 			c.Private.Set(b, SourceEnv)
-		}
-	}
-	if v := os.Getenv("REPOX_VERBOSE"); v != "" {
-		if b, err := strconv.ParseBool(v); err == nil {
-			c.Verbose.Set(b, SourceEnv)
 		}
 	}
 	if v := os.Getenv("REPOX_DRY_RUN"); v != "" {
@@ -373,7 +362,6 @@ func (c *Config) Entries() []Entry {
 		{"clone_directory", c.CloneDirectory.Value, c.CloneDirectory.Source},
 		{"clone_extra_args", c.CloneExtraArgs.Value, c.CloneExtraArgs.Source},
 		{"dry_run", c.DryRun.Value, c.DryRun.Source},
-		{"verbose", c.Verbose.Value, c.Verbose.Source},
 		{"strict", c.Strict.Value, c.Strict.Source},
 		{"open_repo", c.OpenRepo.Value, c.OpenRepo.Source},
 	}

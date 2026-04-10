@@ -7,14 +7,13 @@ import (
 )
 
 var (
-	flagConfig  string
-	flagHost    string
-	flagOwner   string
-	flagOrg     string
-	flagJSON    bool
-	flagVerbose bool
-	flagDryRun  bool
-	flagStrict  bool
+	flagConfig string
+	flagHost   string
+	flagOwner  string
+	flagOrg    string
+	flagJSON   bool
+	flagDryRun bool
+	flagStrict bool
 )
 
 func newRootCmd() *cobra.Command {
@@ -32,7 +31,6 @@ func newRootCmd() *cobra.Command {
 	pf.StringVar(&flagOwner, "owner", "", "Personal owner override")
 	pf.StringVar(&flagOrg, "org", "", "Organization override")
 	pf.BoolVar(&flagJSON, "json", false, "Machine-readable JSON output")
-	pf.BoolVar(&flagVerbose, "verbose", false, "Verbose logs")
 	pf.BoolVar(&flagDryRun, "dry-run", false, "Print plan without making changes")
 	pf.BoolVar(&flagStrict, "strict", false, "Fail on any post-create/apply setting failure")
 

@@ -298,7 +298,6 @@ Available on all commands:
 --owner <owner>      Personal owner override
 --org <org>          Organization override
 --json               Machine-readable JSON output
---verbose            Verbose logs
 --dry-run            Print plan without making changes
 --strict             Fail on any post-create/apply setting failure
 ```

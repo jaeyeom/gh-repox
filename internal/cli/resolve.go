@@ -39,9 +39,6 @@ func applyFlags(cfg *config.Config) {
 	if flagOrg != "" {
 		cfg.Org.Set(flagOrg, config.SourceFlag)
 	}
-	if flagVerbose {
-		cfg.Verbose.Set(true, config.SourceFlag)
-	}
 	if flagDryRun {
 		cfg.DryRun.Set(true, config.SourceFlag)
 	}

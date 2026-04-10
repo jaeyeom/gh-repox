@@ -134,10 +134,31 @@ func PrintDryRun(w io.Writer, header string, commands []string) {
 	}
 }
 
-// FormatCommand formats a command and args for display.
+// ShellQuote returns s quoted for safe shell use if it contains special
+// characters. Safe strings are returned unmodified.
+func ShellQuote(s string) string {
+	if s == "" {
+		return "''"
+	}
+	for _, c := range s {
+		if !isShellSafe(c) {
+			return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+		}
+	}
+	return s
+}
+
+func isShellSafe(c rune) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+		c == '-' || c == '_' || c == '.' || c == '/' || c == '=' || c == ':' || c == '@' || c == '+' || c == ','
+}
+
+// FormatCommand formats a command and args for display with shell quoting.
 func FormatCommand(name string, args ...string) string {
 	parts := make([]string, 0, len(args)+1)
 	parts = append(parts, name)
-	parts = append(parts, args...)
+	for _, a := range args {
+		parts = append(parts, ShellQuote(a))
+	}
 	return strings.Join(parts, " ")
 }

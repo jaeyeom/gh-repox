@@ -21,7 +21,6 @@ func runCmd(args ...string) error {
 	flagOwner = ""
 	flagOrg = ""
 	flagJSON = false
-	flagVerbose = false
 	flagDryRun = false
 	flagStrict = false
 

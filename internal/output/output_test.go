@@ -67,9 +67,39 @@ func TestPrintDiffHuman(t *testing.T) {
 	}
 }
 
+func TestShellQuote(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"", "''"},
+		{"simple", "simple"},
+		{"--flag=value", "--flag=value"},
+		{"owner/repo", "owner/repo"},
+		{"worker service", "'worker service'"},
+		{"it's", `'it'\''s'`},
+		{"hello world", "'hello world'"},
+		{"has\ttab", "'has\ttab'"},
+		{"a;b", "'a;b'"},
+	}
+	for _, tt := range tests {
+		if got := ShellQuote(tt.in); got != tt.want {
+			t.Errorf("ShellQuote(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
 func TestFormatCommand(t *testing.T) {
 	got := FormatCommand("gh", "repo", "create", "test/repo")
 	if got != "gh repo create test/repo" {
 		t.Errorf("got %q", got)
+	}
+}
+
+func TestFormatCommandQuotesSpaces(t *testing.T) {
+	got := FormatCommand("gh", "repo", "create", "owner/repo", "--description", "worker service")
+	want := "gh repo create owner/repo --description 'worker service'"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }

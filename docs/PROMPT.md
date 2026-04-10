@@ -317,7 +317,6 @@ Available to all subcommands:
 --owner <owner>              Personal owner override
 --org <org>                  Organization override
 --json                       Machine-readable output
---verbose                    Verbose logs
 --dry-run                    Print plan without making changes
 --strict                     Fail on any requested post-create/apply setting failure
 ```

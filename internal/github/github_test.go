@@ -262,6 +262,26 @@ func TestPlannedCommands(t *testing.T) {
 	}
 }
 
+func TestPlannedCommandsQuotesSpaces(t *testing.T) {
+	p := &policy.DesiredPolicy{
+		Owner:       "user",
+		Repo:        "my-repo",
+		Private:     true,
+		Description: "worker service",
+	}
+	cmds := PlannedCommands(p, "")
+	// The create command should have the description properly quoted.
+	createCmd := cmds[0]
+	if !strings.Contains(createCmd, "--description 'worker service'") {
+		t.Errorf("create command should quote description with spaces, got:\n%s", createCmd)
+	}
+	// The edit command should also have it quoted.
+	editCmd := cmds[1]
+	if !strings.Contains(editCmd, "--description 'worker service'") {
+		t.Errorf("edit command should quote description with spaces, got:\n%s", editCmd)
+	}
+}
+
 func TestPlannedSecurityCommands(t *testing.T) {
 	tests := []struct {
 		name            string
