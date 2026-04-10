@@ -358,12 +358,15 @@ func TestFetchRepoState(t *testing.T) {
 		"squashMergeAllowed": true,
 		"mergeCommitAllowed": true,
 		"rebaseMergeAllowed": false,
-		"autoMergeAllowed": false,
 		"deleteBranchOnMerge": false
 	}`
 	mock := &exec.MockRunner{
 		Responses: []exec.MockCall{
-			{Stdout: jsonResp},
+			{Stdout: jsonResp},  // gh repo view --json
+			{Stdout: "false\n"}, // fetchAllowAutoMerge via REST API
+			{Stdout: ""},        // fetchVulnerabilityAlertsEnabled
+			{Stdout: ""},        // fetchDependencyGraphEnabled
+			{Stdout: ""},        // fetchAutomatedSecurityFixesEnabled
 		},
 	}
 	c := NewClient(mock, "")
@@ -379,5 +382,8 @@ func TestFetchRepoState(t *testing.T) {
 	}
 	if !state.AllowMergeCommit {
 		t.Error("merge commit should be allowed")
+	}
+	if state.AllowAutoMerge {
+		t.Error("auto merge should be disabled")
 	}
 }

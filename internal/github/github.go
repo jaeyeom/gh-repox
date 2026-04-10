@@ -296,13 +296,12 @@ type repoJSON struct {
 	SquashMergeAllowed  bool   `json:"squashMergeAllowed"`
 	MergeCommitAllowed  bool   `json:"mergeCommitAllowed"`
 	RebaseMergeAllowed  bool   `json:"rebaseMergeAllowed"`
-	AutoMergeAllowed    bool   `json:"autoMergeAllowed"`
 	DeleteBranchOnMerge bool   `json:"deleteBranchOnMerge"`
 }
 
 // FetchRepoState fetches the current repository state.
 func (c *Client) FetchRepoState(ctx context.Context, fullName string) (*policy.ActualState, error) {
-	fields := "isPrivate,description,homepageUrl,hasIssuesEnabled,hasWikiEnabled,hasProjectsEnabled,squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed,autoMergeAllowed,deleteBranchOnMerge"
+	fields := "isPrivate,description,homepageUrl,hasIssuesEnabled,hasWikiEnabled,hasProjectsEnabled,squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed,deleteBranchOnMerge"
 	args := []string{"repo", "view", fullName, "--json", fields}
 	args = append(args, c.hostArgs()...)
 	stdout, stderr, err := c.Runner.Run(ctx, "gh", args...)
@@ -325,7 +324,7 @@ func (c *Client) FetchRepoState(ctx context.Context, fullName string) (*policy.A
 		AllowSquashMerge:    rj.SquashMergeAllowed,
 		AllowMergeCommit:    rj.MergeCommitAllowed,
 		AllowRebaseMerge:    rj.RebaseMergeAllowed,
-		AllowAutoMerge:      rj.AutoMergeAllowed,
+		AllowAutoMerge:      c.fetchAllowAutoMerge(ctx, fullName),
 		DeleteBranchOnMerge: rj.DeleteBranchOnMerge,
 	}
 
@@ -335,6 +334,19 @@ func (c *Client) FetchRepoState(ctx context.Context, fullName string) (*policy.A
 	state.DependabotSecurityUpdates = c.fetchAutomatedSecurityFixesEnabled(ctx, fullName)
 
 	return state, nil
+}
+
+// fetchAllowAutoMerge checks if auto-merge is allowed via the REST API.
+// The autoMergeAllowed field is not available through gh repo view --json,
+// so we fetch it from the REST API's allow_auto_merge field.
+func (c *Client) fetchAllowAutoMerge(ctx context.Context, fullName string) bool {
+	args := []string{"api", fmt.Sprintf("/repos/%s", fullName), "--jq", ".allow_auto_merge"}
+	args = append(args, c.hostArgs()...)
+	stdout, _, err := c.Runner.Run(ctx, "gh", args...)
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(stdout) == "true"
 }
 
 // fetchVulnerabilityAlertsEnabled checks if Dependabot alerts are enabled.

@@ -231,6 +231,12 @@ func executeCreate(ctx context.Context, client *ghclient.Client, cfg *config.Con
 
 	if err := client.EditRepo(ctx, p.FullName(), p); err != nil {
 		if cfg.Strict.Value {
+			result.Warnings = append(result.Warnings, err.Error())
+			if flagJSON {
+				_ = output.PrintJSON(os.Stdout, result)
+			} else {
+				output.PrintCreateHuman(os.Stdout, result)
+			}
 			return exitErrorf(ExitStrictFailed, "edit repo: %w", err)
 		}
 		result.Warnings = append(result.Warnings, err.Error())

@@ -258,7 +258,6 @@ clone:
 
 behavior:
   dry_run: false
-  verbose: false
   strict: false
   open_repo: false
 ```
@@ -282,7 +281,6 @@ REPOX_HOST                 GitHub hostname
 REPOX_OWNER                Personal owner override
 REPOX_ORG                  Organization override
 REPOX_PRIVATE              true/false for repo visibility
-REPOX_VERBOSE              true/false for verbose output
 REPOX_DRY_RUN              true/false for dry-run mode
 REPOX_STRICT               true/false for strict mode
 REPOX_CLONE_AFTER_CREATE   true/false for clone behavior
