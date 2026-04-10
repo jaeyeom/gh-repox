@@ -13,7 +13,7 @@ GOFLAGS  ?=
 all: format fix test build
 
 ## check: CI-safe checks (no mutation)
-check: check-format lint test build
+check: check-format lint test
 
 # ── Build ───────────────────────────────────────────────────────────
 

@@ -383,7 +383,42 @@ func TestFetchRepoState(t *testing.T) {
 	if !state.AllowMergeCommit {
 		t.Error("merge commit should be allowed")
 	}
-	if state.AllowAutoMerge {
+	if state.AllowAutoMerge == nil {
+		t.Fatal("auto merge should not be nil")
+	}
+	if *state.AllowAutoMerge {
 		t.Error("auto merge should be disabled")
+	}
+}
+
+func TestFetchRepoState_AutoMergeUnknownOnError(t *testing.T) {
+	jsonResp := `{
+		"isPrivate": false,
+		"description": "",
+		"homepageUrl": "",
+		"hasIssuesEnabled": true,
+		"hasWikiEnabled": true,
+		"hasProjectsEnabled": true,
+		"squashMergeAllowed": true,
+		"mergeCommitAllowed": true,
+		"rebaseMergeAllowed": true,
+		"deleteBranchOnMerge": false
+	}`
+	mock := &exec.MockRunner{
+		Responses: []exec.MockCall{
+			{Stdout: jsonResp}, // gh repo view --json
+			{Stderr: "403 Forbidden", Err: fmt.Errorf("exit 1")}, // fetchAllowAutoMerge fails
+			{Stdout: ""}, // fetchVulnerabilityAlertsEnabled
+			{Stdout: ""}, // fetchDependencyGraphEnabled
+			{Stdout: ""}, // fetchAutomatedSecurityFixesEnabled
+		},
+	}
+	c := NewClient(mock, "")
+	state, err := c.FetchRepoState(context.Background(), "user/repo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.AllowAutoMerge != nil {
+		t.Errorf("AllowAutoMerge should be nil on API error, got %v", *state.AllowAutoMerge)
 	}
 }

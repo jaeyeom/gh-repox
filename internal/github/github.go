@@ -339,14 +339,16 @@ func (c *Client) FetchRepoState(ctx context.Context, fullName string) (*policy.A
 // fetchAllowAutoMerge checks if auto-merge is allowed via the REST API.
 // The autoMergeAllowed field is not available through gh repo view --json,
 // so we fetch it from the REST API's allow_auto_merge field.
-func (c *Client) fetchAllowAutoMerge(ctx context.Context, fullName string) bool {
+// Returns nil on error to indicate the value is unknown.
+func (c *Client) fetchAllowAutoMerge(ctx context.Context, fullName string) *bool {
 	args := []string{"api", fmt.Sprintf("/repos/%s", fullName), "--jq", ".allow_auto_merge"}
 	args = append(args, c.hostArgs()...)
 	stdout, _, err := c.Runner.Run(ctx, "gh", args...)
 	if err != nil {
-		return false
+		return nil
 	}
-	return strings.TrimSpace(stdout) == "true"
+	enabled := strings.TrimSpace(stdout) == "true"
+	return &enabled
 }
 
 // fetchVulnerabilityAlertsEnabled checks if Dependabot alerts are enabled.

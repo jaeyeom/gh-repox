@@ -81,7 +81,7 @@ func Compare(desired *policy.DesiredPolicy, actual *policy.ActualState, cfg *con
 	addBool("allow_squash_merge", actual.AllowSquashMerge, desired.AllowSquashMerge, cfg.AllowSquashMerge.Source)
 	addBool("allow_merge_commit", actual.AllowMergeCommit, desired.AllowMergeCommit, cfg.AllowMergeCommit.Source)
 	addBool("allow_rebase_merge", actual.AllowRebaseMerge, desired.AllowRebaseMerge, cfg.AllowRebaseMerge.Source)
-	addBool("allow_auto_merge", actual.AllowAutoMerge, desired.AllowAutoMerge, cfg.AllowAutoMerge.Source)
+	addOptBool("allow_auto_merge", actual.AllowAutoMerge, desired.AllowAutoMerge, cfg.AllowAutoMerge.Source)
 	addBool("delete_branch_on_merge", actual.DeleteBranchOnMerge, desired.DeleteBranchOnMerge, cfg.DeleteBranchOnMerge.Source)
 	addOptBool("dependency_graph", actual.DependencyGraph, desired.DependencyGraph, cfg.DependencyGraph.Source)
 	addOptBool("dependabot_alerts", actual.DependabotAlerts, desired.DependabotAlerts, cfg.DependabotAlerts.Source)

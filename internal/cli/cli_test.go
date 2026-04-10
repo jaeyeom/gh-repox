@@ -93,6 +93,25 @@ func TestConfigExplainBadConfig_ExitCode2(t *testing.T) {
 	assertExitCode(t, err, ExitInvalidInput)
 }
 
+func TestCreateConflictingFlags_ExitCode2(t *testing.T) {
+	tests := []struct {
+		name  string
+		flags []string
+	}{
+		{"private and public", []string{"--private", "--public"}},
+		{"enable and disable issues", []string{"--enable-issues", "--disable-issues"}},
+		{"enable and disable wiki", []string{"--enable-wiki", "--disable-wiki"}},
+		{"enable and disable projects", []string{"--enable-projects", "--disable-projects"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := append([]string{"create", "test-repo", "--dry-run", "--owner", "testowner"}, tt.flags...)
+			err := runCmd(args...)
+			assertExitCode(t, err, ExitInvalidInput)
+		})
+	}
+}
+
 func TestCreateDryRunJSON(t *testing.T) {
 	old := os.Stdout
 	r, w, _ := os.Pipe()

@@ -32,7 +32,7 @@ func TestCompare(t *testing.T) {
 		AllowSquashMerge:    true,
 		AllowMergeCommit:    true,
 		AllowRebaseMerge:    false,
-		AllowAutoMerge:      false,
+		AllowAutoMerge:      boolPtr(false),
 		DeleteBranchOnMerge: true,
 		DependencyGraph:     boolPtr(true),
 		DependabotAlerts:    nil,

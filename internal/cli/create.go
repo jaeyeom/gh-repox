@@ -41,9 +41,22 @@ func newCreateCmd() *cobra.Command {
 		Use:   "create <name>",
 		Short: "Create a new repository with opinionated defaults",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 			repoName := args[0]
+
+			// Reject conflicting flag pairs
+			conflicts := [][2]string{
+				{"private", "public"},
+				{"enable-issues", "disable-issues"},
+				{"enable-wiki", "disable-wiki"},
+				{"enable-projects", "disable-projects"},
+			}
+			for _, pair := range conflicts {
+				if cmd.Flags().Changed(pair[0]) && cmd.Flags().Changed(pair[1]) {
+					return exitErrorf(ExitInvalidInput, "conflicting flags: --%s and --%s", pair[0], pair[1])
+				}
+			}
 
 			cfg, err := resolveConfig()
 			if err != nil {

@@ -49,7 +49,7 @@ type ActualState struct {
 	AllowSquashMerge    bool
 	AllowMergeCommit    bool
 	AllowRebaseMerge    bool
-	AllowAutoMerge      bool
+	AllowAutoMerge      *bool
 	DeleteBranchOnMerge bool
 
 	DependencyGraph           *bool
