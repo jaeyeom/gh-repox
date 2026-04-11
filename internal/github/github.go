@@ -457,24 +457,25 @@ func (c *Client) ApplySecuritySettings(ctx context.Context, fullName string, p *
 func PlannedSecurityCommands(fullName string, p *policy.DesiredPolicy, host string) []string {
 	ha := HostArgs(host)
 	hostSuffix := ""
-	if len(ha) > 0 {
-		hostSuffix = " " + strings.Join(ha, " ")
+	for _, a := range ha {
+		hostSuffix += " " + output.ShellQuote(a)
 	}
+	qn := output.ShellQuote("/repos/" + fullName)
 	var cmds []string
 	if p.DependencyGraph {
-		cmds = append(cmds, fmt.Sprintf(`echo '{"security_and_analysis":{"dependency_graph":{"status":"enabled"}}}' | gh api --method PATCH /repos/%s --input -%s`, fullName, hostSuffix))
+		cmds = append(cmds, fmt.Sprintf(`echo '{"security_and_analysis":{"dependency_graph":{"status":"enabled"}}}' | gh api --method PATCH %s --input -%s`, qn, hostSuffix))
 	} else {
-		cmds = append(cmds, fmt.Sprintf(`echo '{"security_and_analysis":{"dependency_graph":{"status":"disabled"}}}' | gh api --method PATCH /repos/%s --input -%s`, fullName, hostSuffix))
+		cmds = append(cmds, fmt.Sprintf(`echo '{"security_and_analysis":{"dependency_graph":{"status":"disabled"}}}' | gh api --method PATCH %s --input -%s`, qn, hostSuffix))
 	}
 	if p.DependabotAlerts {
-		cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/vulnerability-alerts%s", fullName, hostSuffix))
+		cmds = append(cmds, fmt.Sprintf("gh api --method PUT %s/vulnerability-alerts%s", qn, hostSuffix))
 	} else {
-		cmds = append(cmds, fmt.Sprintf("gh api --method DELETE /repos/%s/vulnerability-alerts%s", fullName, hostSuffix))
+		cmds = append(cmds, fmt.Sprintf("gh api --method DELETE %s/vulnerability-alerts%s", qn, hostSuffix))
 	}
 	if p.DependabotSecurityUpdates {
-		cmds = append(cmds, fmt.Sprintf("gh api --method PUT /repos/%s/automated-security-fixes%s", fullName, hostSuffix))
+		cmds = append(cmds, fmt.Sprintf("gh api --method PUT %s/automated-security-fixes%s", qn, hostSuffix))
 	} else {
-		cmds = append(cmds, fmt.Sprintf("gh api --method DELETE /repos/%s/automated-security-fixes%s", fullName, hostSuffix))
+		cmds = append(cmds, fmt.Sprintf("gh api --method DELETE %s/automated-security-fixes%s", qn, hostSuffix))
 	}
 	return cmds
 }

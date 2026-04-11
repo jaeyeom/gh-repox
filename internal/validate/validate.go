@@ -2,21 +2,49 @@ package validate
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/jaeyeom/gh-repox/internal/policy"
 )
 
-// Create validates a desired policy for repository creation.
-func Create(p *policy.DesiredPolicy) error {
-	if p.Owner == "" {
+// ownerRe matches valid GitHub usernames and org names: alphanumeric and
+// single hyphens, not starting or ending with a hyphen.
+var ownerRe = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$`)
+
+// repoRe matches valid GitHub repository names: alphanumeric, hyphens,
+// underscores, and dots.
+var repoRe = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+
+// Owner validates a GitHub owner (user or organization) name.
+func Owner(owner string) error {
+	if owner == "" {
 		return fmt.Errorf("owner is required: run `gh auth login`, or pass --owner or --org")
 	}
-	if p.Repo == "" {
+	if !ownerRe.MatchString(owner) {
+		return fmt.Errorf("invalid owner %q: must contain only alphanumeric characters or hyphens, and cannot start or end with a hyphen", owner)
+	}
+	return nil
+}
+
+// Repo validates a GitHub repository name.
+func Repo(repo string) error {
+	if repo == "" {
 		return fmt.Errorf("repository name is required")
 	}
-	if strings.Contains(p.Repo, "/") {
-		return fmt.Errorf("repository name should not contain '/': got %q", p.Repo)
+	if !repoRe.MatchString(repo) {
+		return fmt.Errorf("invalid repository name %q: must contain only alphanumeric characters, hyphens, underscores, or dots", repo)
+	}
+	return nil
+}
+
+// Create validates a desired policy for repository creation.
+func Create(p *policy.DesiredPolicy) error {
+	if err := Owner(p.Owner); err != nil {
+		return err
+	}
+	if err := Repo(p.Repo); err != nil {
+		return err
 	}
 	if p.Template != "" && (p.AutoInit || p.Gitignore != "" || p.License != "") {
 		return fmt.Errorf("cannot use --template with --add-readme, --gitignore, or --license")
@@ -26,8 +54,11 @@ func Create(p *policy.DesiredPolicy) error {
 
 // Apply validates a desired policy for applying to an existing repo.
 func Apply(owner, repo string) error {
-	if owner == "" || repo == "" {
-		return fmt.Errorf("owner/repo is required (e.g., octocat/my-repo)")
+	if err := Owner(owner); err != nil {
+		return err
+	}
+	if err := Repo(repo); err != nil {
+		return err
 	}
 	return nil
 }
