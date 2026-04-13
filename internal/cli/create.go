@@ -242,22 +242,26 @@ func executeCreate(ctx context.Context, client *ghclient.Client, cfg *config.Con
 		Warnings:    []string{},
 	}
 
-	if err := client.EditRepo(ctx, p.FullName(), p); err != nil {
+	// Retry on 404: GitHub may need a moment to propagate the new repo.
+	editErr := ghclient.RetryOnNotFound(ctx, ghclient.DefaultRetryAttempts, ghclient.DefaultRetryDelay, func() error {
+		return client.EditRepo(ctx, p.FullName(), p)
+	})
+	if editErr != nil {
 		if cfg.Strict.Value {
-			result.Warnings = append(result.Warnings, err.Error())
+			result.Warnings = append(result.Warnings, editErr.Error())
 			if flagJSON {
 				_ = output.PrintJSON(os.Stdout, result)
 			} else {
 				output.PrintCreateHuman(os.Stdout, result)
 			}
-			return exitErrorf(ExitStrictFailed, "edit repo: %w", err)
+			return exitErrorf(ExitStrictFailed, "edit repo: %w", editErr)
 		}
-		result.Warnings = append(result.Warnings, err.Error())
+		result.Warnings = append(result.Warnings, editErr.Error())
 	} else {
 		result.Applied = buildAppliedMap(p)
 	}
 
-	secApplied, secWarnings := client.ApplySecuritySettings(ctx, p.FullName(), p, cfg.Strict.Value)
+	secApplied, secWarnings := client.ApplySecuritySettings(ctx, p.FullName(), p, true)
 	for _, s := range secApplied {
 		result.Applied[s] = true
 	}

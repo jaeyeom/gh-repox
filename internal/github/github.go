@@ -411,16 +411,25 @@ func (c *Client) fetchAutomatedSecurityFixesEnabled(ctx context.Context, fullNam
 }
 
 // ApplySecuritySettings applies security-related settings.
-func (c *Client) ApplySecuritySettings(ctx context.Context, fullName string, p *policy.DesiredPolicy, _ bool) (applied []string, warnings []string) {
+// When retryOnNotFound is true, each API call is retried on HTTP 404 errors
+// to handle GitHub's eventual consistency after repo creation.
+func (c *Client) ApplySecuritySettings(ctx context.Context, fullName string, p *policy.DesiredPolicy, retryOnNotFound bool) (applied []string, warnings []string) {
+	run := func(fn func() error) error {
+		if retryOnNotFound {
+			return RetryOnNotFound(ctx, DefaultRetryAttempts, DefaultRetryDelay, fn)
+		}
+		return fn()
+	}
+
 	// Dependency graph
 	if p.DependencyGraph {
-		if err := c.EnableDependencyGraph(ctx, fullName); err != nil {
+		if err := run(func() error { return c.EnableDependencyGraph(ctx, fullName) }); err != nil {
 			warnings = append(warnings, err.Error())
 		} else {
 			applied = append(applied, "dependency graph enabled")
 		}
 	} else {
-		if err := c.DisableDependencyGraph(ctx, fullName); err != nil {
+		if err := run(func() error { return c.DisableDependencyGraph(ctx, fullName) }); err != nil {
 			warnings = append(warnings, err.Error())
 		} else {
 			applied = append(applied, "dependency graph disabled")
@@ -429,13 +438,13 @@ func (c *Client) ApplySecuritySettings(ctx context.Context, fullName string, p *
 
 	// Dependabot alerts
 	if p.DependabotAlerts {
-		if err := c.EnableVulnerabilityAlerts(ctx, fullName); err != nil {
+		if err := run(func() error { return c.EnableVulnerabilityAlerts(ctx, fullName) }); err != nil {
 			warnings = append(warnings, err.Error())
 		} else {
 			applied = append(applied, "Dependabot alerts enabled")
 		}
 	} else {
-		if err := c.DisableVulnerabilityAlerts(ctx, fullName); err != nil {
+		if err := run(func() error { return c.DisableVulnerabilityAlerts(ctx, fullName) }); err != nil {
 			warnings = append(warnings, err.Error())
 		} else {
 			applied = append(applied, "Dependabot alerts disabled")
@@ -444,13 +453,13 @@ func (c *Client) ApplySecuritySettings(ctx context.Context, fullName string, p *
 
 	// Dependabot security updates
 	if p.DependabotSecurityUpdates {
-		if err := c.EnableAutomatedSecurityFixes(ctx, fullName); err != nil {
+		if err := run(func() error { return c.EnableAutomatedSecurityFixes(ctx, fullName) }); err != nil {
 			warnings = append(warnings, err.Error())
 		} else {
 			applied = append(applied, "Dependabot security updates enabled")
 		}
 	} else {
-		if err := c.DisableAutomatedSecurityFixes(ctx, fullName); err != nil {
+		if err := run(func() error { return c.DisableAutomatedSecurityFixes(ctx, fullName) }); err != nil {
 			warnings = append(warnings, err.Error())
 		} else {
 			applied = append(applied, "Dependabot security updates disabled")

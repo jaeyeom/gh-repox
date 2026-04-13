@@ -89,7 +89,7 @@ func newApplyCmd() *cobra.Command {
 			}
 
 			// Security settings
-			secApplied, secWarnings := client.ApplySecuritySettings(ctx, fullName, p, cfg.Strict.Value)
+			secApplied, secWarnings := client.ApplySecuritySettings(ctx, fullName, p, false)
 			result.Applied = append(result.Applied, secApplied...)
 			result.Warnings = append(result.Warnings, secWarnings...)
 
