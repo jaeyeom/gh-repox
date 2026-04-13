@@ -387,11 +387,18 @@ func (c *Client) fetchDependencyGraphEnabled(ctx context.Context, fullName strin
 }
 
 // fetchAutomatedSecurityFixesEnabled checks if Dependabot security updates are enabled.
+// The endpoint returns 200 with JSON when accessible, 404 when not enabled.
+// On other errors (permissions, network), returns nil to indicate unknown.
 func (c *Client) fetchAutomatedSecurityFixesEnabled(ctx context.Context, fullName string) *bool {
 	args := []string{"api", fmt.Sprintf("/repos/%s/automated-security-fixes", fullName)}
 	args = append(args, c.hostArgs()...)
-	stdout, _, err := c.Runner.Run(ctx, "gh", args...)
+	stdout, stderr, err := c.Runner.Run(ctx, "gh", args...)
 	if err != nil {
+		// 404 means security fixes are not enabled; other errors are unknown.
+		if strings.Contains(strings.ToLower(strings.TrimSpace(stderr)), "not found") {
+			enabled := false
+			return &enabled
+		}
 		return nil
 	}
 	var result struct {

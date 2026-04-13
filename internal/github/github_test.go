@@ -391,6 +391,73 @@ func TestFetchRepoState(t *testing.T) {
 	}
 }
 
+func TestFetchRepoState_AutomatedSecurityFixes404MeansDisabled(t *testing.T) {
+	jsonResp := `{
+		"isPrivate": false,
+		"description": "",
+		"homepageUrl": "",
+		"hasIssuesEnabled": true,
+		"hasWikiEnabled": true,
+		"hasProjectsEnabled": true,
+		"squashMergeAllowed": true,
+		"mergeCommitAllowed": true,
+		"rebaseMergeAllowed": true,
+		"deleteBranchOnMerge": false
+	}`
+	mock := &exec.MockRunner{
+		Responses: []exec.MockCall{
+			{Stdout: jsonResp},  // gh repo view --json
+			{Stdout: "false\n"}, // fetchAllowAutoMerge
+			{Stdout: ""},        // fetchVulnerabilityAlertsEnabled
+			{Stdout: ""},        // fetchDependencyGraphEnabled
+			{Stderr: "HTTP 404: Not Found", Err: fmt.Errorf("exit 1")}, // fetchAutomatedSecurityFixesEnabled 404
+		},
+	}
+	c := NewClient(mock, "")
+	state, err := c.FetchRepoState(context.Background(), "user/repo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.DependabotSecurityUpdates == nil {
+		t.Fatal("DependabotSecurityUpdates should not be nil on 404 (should be false)")
+	}
+	if *state.DependabotSecurityUpdates {
+		t.Error("DependabotSecurityUpdates should be false on 404")
+	}
+}
+
+func TestFetchRepoState_AutomatedSecurityFixes403MeansUnknown(t *testing.T) {
+	jsonResp := `{
+		"isPrivate": false,
+		"description": "",
+		"homepageUrl": "",
+		"hasIssuesEnabled": true,
+		"hasWikiEnabled": true,
+		"hasProjectsEnabled": true,
+		"squashMergeAllowed": true,
+		"mergeCommitAllowed": true,
+		"rebaseMergeAllowed": true,
+		"deleteBranchOnMerge": false
+	}`
+	mock := &exec.MockRunner{
+		Responses: []exec.MockCall{
+			{Stdout: jsonResp},  // gh repo view --json
+			{Stdout: "false\n"}, // fetchAllowAutoMerge
+			{Stdout: ""},        // fetchVulnerabilityAlertsEnabled
+			{Stdout: ""},        // fetchDependencyGraphEnabled
+			{Stderr: "403 Forbidden", Err: fmt.Errorf("exit 1")}, // fetchAutomatedSecurityFixesEnabled permission error
+		},
+	}
+	c := NewClient(mock, "")
+	state, err := c.FetchRepoState(context.Background(), "user/repo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.DependabotSecurityUpdates != nil {
+		t.Errorf("DependabotSecurityUpdates should be nil on permission error, got %v", *state.DependabotSecurityUpdates)
+	}
+}
+
 func TestFetchRepoState_AutoMergeUnknownOnError(t *testing.T) {
 	jsonResp := `{
 		"isPrivate": false,
