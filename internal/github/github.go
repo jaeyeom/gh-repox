@@ -420,6 +420,17 @@ func (c *Client) fetchAutomatedSecurityFixesEnabled(ctx context.Context, fullNam
 	return &result.Enabled
 }
 
+// securitySetting describes one enable/disable toggle applied via the GitHub API.
+type securitySetting struct {
+	enable      func() error
+	disable     func() error
+	verify      func() *bool // optional; nil means no verification
+	enabledMsg  string
+	disabledMsg string
+	verifyWarn  string // warning when verify shows the setting did not stick
+	desired     bool
+}
+
 // ApplySecuritySettings applies security-related settings.
 // When retryOnNotFound is true, each API call is retried on HTTP 404 errors
 // to handle GitHub's eventual consistency after repo creation.
@@ -431,64 +442,59 @@ func (c *Client) ApplySecuritySettings(ctx context.Context, fullName string, p *
 		return fn()
 	}
 
-	// Auto-merge (applied via REST API; gh repo edit may silently skip this setting)
-	if p.AllowAutoMerge {
-		if err := run(func() error { return c.SetAllowAutoMerge(ctx, fullName, true) }); err != nil {
-			warnings = append(warnings, err.Error())
-		} else {
-			applied = append(applied, "auto-merge enabled")
-		}
-	} else {
-		if err := run(func() error { return c.SetAllowAutoMerge(ctx, fullName, false) }); err != nil {
-			warnings = append(warnings, err.Error())
-		} else {
-			applied = append(applied, "auto-merge disabled")
-		}
+	settings := []securitySetting{
+		{
+			enable:      func() error { return c.SetAllowAutoMerge(ctx, fullName, true) },
+			disable:     func() error { return c.SetAllowAutoMerge(ctx, fullName, false) },
+			verify:      func() *bool { return c.fetchAllowAutoMerge(ctx, fullName) },
+			enabledMsg:  "auto-merge enabled",
+			disabledMsg: "auto-merge disabled",
+			verifyWarn:  "allow_auto_merge: accepted by API but not applied (auto-merge may require GitHub Team or higher for private repositories)",
+			desired:     p.AllowAutoMerge,
+		},
+		{
+			enable:      func() error { return c.EnableDependencyGraph(ctx, fullName) },
+			disable:     func() error { return c.DisableDependencyGraph(ctx, fullName) },
+			verify:      func() *bool { return c.fetchDependencyGraphEnabled(ctx, fullName) },
+			enabledMsg:  "dependency graph enabled",
+			disabledMsg: "dependency graph disabled",
+			verifyWarn:  "dependency_graph: accepted by API but not applied",
+			desired:     p.DependencyGraph,
+		},
+		{
+			enable:      func() error { return c.EnableVulnerabilityAlerts(ctx, fullName) },
+			disable:     func() error { return c.DisableVulnerabilityAlerts(ctx, fullName) },
+			enabledMsg:  "Dependabot alerts enabled",
+			disabledMsg: "Dependabot alerts disabled",
+			desired:     p.DependabotAlerts,
+		},
+		{
+			enable:      func() error { return c.EnableAutomatedSecurityFixes(ctx, fullName) },
+			disable:     func() error { return c.DisableAutomatedSecurityFixes(ctx, fullName) },
+			enabledMsg:  "Dependabot security updates enabled",
+			disabledMsg: "Dependabot security updates disabled",
+			desired:     p.DependabotSecurityUpdates,
+		},
 	}
 
-	// Dependency graph
-	if p.DependencyGraph {
-		if err := run(func() error { return c.EnableDependencyGraph(ctx, fullName) }); err != nil {
-			warnings = append(warnings, err.Error())
-		} else {
-			applied = append(applied, "dependency graph enabled")
+	for _, s := range settings {
+		fn := s.disable
+		msg := s.disabledMsg
+		if s.desired {
+			fn = s.enable
+			msg = s.enabledMsg
 		}
-	} else {
-		if err := run(func() error { return c.DisableDependencyGraph(ctx, fullName) }); err != nil {
+		if err := run(fn); err != nil {
 			warnings = append(warnings, err.Error())
-		} else {
-			applied = append(applied, "dependency graph disabled")
+			continue
 		}
-	}
-
-	// Dependabot alerts
-	if p.DependabotAlerts {
-		if err := run(func() error { return c.EnableVulnerabilityAlerts(ctx, fullName) }); err != nil {
-			warnings = append(warnings, err.Error())
-		} else {
-			applied = append(applied, "Dependabot alerts enabled")
+		if s.desired && s.verify != nil {
+			if actual := s.verify(); actual != nil && !*actual {
+				warnings = append(warnings, s.verifyWarn)
+				continue
+			}
 		}
-	} else {
-		if err := run(func() error { return c.DisableVulnerabilityAlerts(ctx, fullName) }); err != nil {
-			warnings = append(warnings, err.Error())
-		} else {
-			applied = append(applied, "Dependabot alerts disabled")
-		}
-	}
-
-	// Dependabot security updates
-	if p.DependabotSecurityUpdates {
-		if err := run(func() error { return c.EnableAutomatedSecurityFixes(ctx, fullName) }); err != nil {
-			warnings = append(warnings, err.Error())
-		} else {
-			applied = append(applied, "Dependabot security updates enabled")
-		}
-	} else {
-		if err := run(func() error { return c.DisableAutomatedSecurityFixes(ctx, fullName) }); err != nil {
-			warnings = append(warnings, err.Error())
-		} else {
-			applied = append(applied, "Dependabot security updates disabled")
-		}
+		applied = append(applied, msg)
 	}
 
 	return applied, warnings
