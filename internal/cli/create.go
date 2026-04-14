@@ -338,7 +338,6 @@ func buildAppliedMap(p *policy.DesiredPolicy) map[string]any {
 		"allow_squash_merge":     p.AllowSquashMerge,
 		"allow_merge_commit":     p.AllowMergeCommit,
 		"allow_rebase_merge":     p.AllowRebaseMerge,
-		"allow_auto_merge":       p.AllowAutoMerge,
 		"delete_branch_on_merge": p.DeleteBranchOnMerge,
 		"has_issues":             p.HasIssues,
 		"has_wiki":               p.HasWiki,

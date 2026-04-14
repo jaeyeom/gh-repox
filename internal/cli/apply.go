@@ -82,7 +82,6 @@ func newApplyCmd() *cobra.Command {
 					"squash merge: "+enabledStr(p.AllowSquashMerge),
 					"merge commits: "+enabledStr(p.AllowMergeCommit),
 					"rebase merge: "+enabledStr(p.AllowRebaseMerge),
-					"auto-merge: "+enabledStr(p.AllowAutoMerge),
 					"delete branch on merge: "+enabledStr(p.DeleteBranchOnMerge),
 					"projects: "+enabledStr(p.HasProjects),
 				)

@@ -141,7 +141,6 @@ func EditRepoArgs(fullName string, p *policy.DesiredPolicy) []string {
 	args = append(args, fmt.Sprintf("--enable-squash-merge=%t", p.AllowSquashMerge))
 	args = append(args, fmt.Sprintf("--enable-merge-commit=%t", p.AllowMergeCommit))
 	args = append(args, fmt.Sprintf("--enable-rebase-merge=%t", p.AllowRebaseMerge))
-	args = append(args, fmt.Sprintf("--enable-auto-merge=%t", p.AllowAutoMerge))
 	args = append(args, fmt.Sprintf("--delete-branch-on-merge=%t", p.DeleteBranchOnMerge))
 	args = append(args, fmt.Sprintf("--enable-projects=%t", p.HasProjects))
 
@@ -181,8 +180,8 @@ func (c *Client) DisableVulnerabilityAlerts(ctx context.Context, fullName string
 	return nil
 }
 
-// patchSecurityAnalysis sends a PATCH to /repos/{repo} with a security_and_analysis body.
-func (c *Client) patchSecurityAnalysis(ctx context.Context, fullName string, body string) error {
+// patchRepo sends a PATCH to /repos/{repo} with the given JSON body.
+func (c *Client) patchRepo(ctx context.Context, fullName string, body string) error {
 	tmpFile, err := os.CreateTemp("", "gh-repox-*.json")
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
@@ -198,7 +197,7 @@ func (c *Client) patchSecurityAnalysis(ctx context.Context, fullName string, bod
 	args = append(args, c.hostArgs()...)
 	_, stderr, err := c.Runner.Run(ctx, "gh", args...)
 	if err != nil {
-		return fmt.Errorf("PATCH security_and_analysis: %s: %w", strings.TrimSpace(stderr), err)
+		return fmt.Errorf("PATCH /repos/%s: %s: %w", fullName, strings.TrimSpace(stderr), err)
 	}
 	return nil
 }
@@ -206,7 +205,7 @@ func (c *Client) patchSecurityAnalysis(ctx context.Context, fullName string, bod
 // EnableDependencyGraph enables the dependency graph via the security_and_analysis API.
 func (c *Client) EnableDependencyGraph(ctx context.Context, fullName string) error {
 	body := `{"security_and_analysis":{"dependency_graph":{"status":"enabled"}}}`
-	if err := c.patchSecurityAnalysis(ctx, fullName, body); err != nil {
+	if err := c.patchRepo(ctx, fullName, body); err != nil {
 		return fmt.Errorf("could not enable dependency graph: %w", err)
 	}
 	return nil
@@ -215,8 +214,19 @@ func (c *Client) EnableDependencyGraph(ctx context.Context, fullName string) err
 // DisableDependencyGraph disables the dependency graph via the security_and_analysis API.
 func (c *Client) DisableDependencyGraph(ctx context.Context, fullName string) error {
 	body := `{"security_and_analysis":{"dependency_graph":{"status":"disabled"}}}`
-	if err := c.patchSecurityAnalysis(ctx, fullName, body); err != nil {
+	if err := c.patchRepo(ctx, fullName, body); err != nil {
 		return fmt.Errorf("could not disable dependency graph: %w", err)
+	}
+	return nil
+}
+
+// SetAllowAutoMerge enables or disables auto-merge via the REST API.
+// This bypasses gh repo edit, which may silently skip this setting
+// on plans that restrict auto-merge for private repositories.
+func (c *Client) SetAllowAutoMerge(ctx context.Context, fullName string, enable bool) error {
+	body := fmt.Sprintf(`{"allow_auto_merge":%t}`, enable)
+	if err := c.patchRepo(ctx, fullName, body); err != nil {
+		return fmt.Errorf("could not set allow_auto_merge: %w", err)
 	}
 	return nil
 }
@@ -421,6 +431,21 @@ func (c *Client) ApplySecuritySettings(ctx context.Context, fullName string, p *
 		return fn()
 	}
 
+	// Auto-merge (applied via REST API; gh repo edit may silently skip this setting)
+	if p.AllowAutoMerge {
+		if err := run(func() error { return c.SetAllowAutoMerge(ctx, fullName, true) }); err != nil {
+			warnings = append(warnings, err.Error())
+		} else {
+			applied = append(applied, "auto-merge enabled")
+		}
+	} else {
+		if err := run(func() error { return c.SetAllowAutoMerge(ctx, fullName, false) }); err != nil {
+			warnings = append(warnings, err.Error())
+		} else {
+			applied = append(applied, "auto-merge disabled")
+		}
+	}
+
 	// Dependency graph
 	if p.DependencyGraph {
 		if err := run(func() error { return c.EnableDependencyGraph(ctx, fullName) }); err != nil {
@@ -478,6 +503,8 @@ func PlannedSecurityCommands(fullName string, p *policy.DesiredPolicy, host stri
 	}
 	qn := output.ShellQuote("/repos/" + fullName)
 	var cmds []string
+	// Auto-merge
+	cmds = append(cmds, fmt.Sprintf(`echo '{"allow_auto_merge":%t}' | gh api --method PATCH %s --input -%s`, p.AllowAutoMerge, qn, hostSuffix))
 	if p.DependencyGraph {
 		cmds = append(cmds, fmt.Sprintf(`echo '{"security_and_analysis":{"dependency_graph":{"status":"enabled"}}}' | gh api --method PATCH %s --input -%s`, qn, hostSuffix))
 	} else {

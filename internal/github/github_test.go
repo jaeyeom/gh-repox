@@ -124,7 +124,6 @@ func TestEditRepoArgs(t *testing.T) {
 				"--enable-squash-merge=true",
 				"--enable-merge-commit=true",
 				"--enable-rebase-merge=true",
-				"--enable-auto-merge=true",
 				"--delete-branch-on-merge=true",
 				"--enable-projects=true",
 				"--visibility", "private",
@@ -151,7 +150,6 @@ func TestEditRepoArgs(t *testing.T) {
 				"--enable-squash-merge=false",
 				"--enable-merge-commit=false",
 				"--enable-rebase-merge=false",
-				"--enable-auto-merge=false",
 				"--delete-branch-on-merge=false",
 				"--enable-projects=false",
 				"--visibility", "public",
@@ -292,11 +290,13 @@ func TestPlannedSecurityCommands(t *testing.T) {
 		{
 			name: "all enabled",
 			policy: &policy.DesiredPolicy{
+				AllowAutoMerge:            true,
 				DependencyGraph:           true,
 				DependabotAlerts:          true,
 				DependabotSecurityUpdates: true,
 			},
 			wantSubstrings: []string{
+				`echo '{"allow_auto_merge":true}' | gh api --method PATCH /repos/owner/repo --input -`,
 				`echo '{"security_and_analysis":{"dependency_graph":{"status":"enabled"}}}' | gh api --method PATCH /repos/owner/repo --input -`,
 				"gh api --method PUT /repos/owner/repo/vulnerability-alerts",
 				"gh api --method PUT /repos/owner/repo/automated-security-fixes",
@@ -305,11 +305,13 @@ func TestPlannedSecurityCommands(t *testing.T) {
 		{
 			name: "all disabled",
 			policy: &policy.DesiredPolicy{
+				AllowAutoMerge:            false,
 				DependencyGraph:           false,
 				DependabotAlerts:          false,
 				DependabotSecurityUpdates: false,
 			},
 			wantSubstrings: []string{
+				`echo '{"allow_auto_merge":false}' | gh api --method PATCH /repos/owner/repo --input -`,
 				`echo '{"security_and_analysis":{"dependency_graph":{"status":"disabled"}}}' | gh api --method PATCH /repos/owner/repo --input -`,
 				"gh api --method DELETE /repos/owner/repo/vulnerability-alerts",
 				"gh api --method DELETE /repos/owner/repo/automated-security-fixes",
@@ -329,8 +331,8 @@ func TestPlannedSecurityCommands(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmds := PlannedSecurityCommands("owner/repo", tt.policy, "")
-			if len(cmds) != 3 {
-				t.Fatalf("expected 3 commands, got %d", len(cmds))
+			if len(cmds) != 4 {
+				t.Fatalf("expected 4 commands, got %d", len(cmds))
 			}
 			joined := strings.Join(cmds, "\n")
 			for _, want := range tt.wantSubstrings {
