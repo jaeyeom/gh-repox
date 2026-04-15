@@ -59,6 +59,7 @@ linters:
           allow:
             - $gostd
             - "github.com/jaeyeom/gh-repox"
+            - github.com/jaeyeom/go-cmdexec
             - github.com/spf13/cobra
             - gopkg.in/yaml.v3
           deny:

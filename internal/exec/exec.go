@@ -1,10 +1,10 @@
 package exec
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"os/exec"
+
+	"github.com/jaeyeom/go-cmdexec"
 )
 
 // Runner abstracts subprocess execution for testability.
@@ -12,19 +12,29 @@ type Runner interface {
 	Run(ctx context.Context, name string, args ...string) (stdout string, stderr string, err error)
 }
 
-// RealRunner executes real subprocesses.
-type RealRunner struct{}
+// RealRunner executes real subprocesses via go-cmdexec.
+type RealRunner struct {
+	executor cmdexec.Executor
+}
 
 // Compile-time check that RealRunner implements Runner.
 var _ Runner = (*RealRunner)(nil)
 
 func (r *RealRunner) Run(ctx context.Context, name string, args ...string) (string, string, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
-	var outBuf, errBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-	cmd.Stderr = &errBuf
-	err := cmd.Run()
-	return outBuf.String(), errBuf.String(), err
+	if r.executor == nil {
+		r.executor = cmdexec.NewBasicExecutor()
+	}
+	result, err := r.executor.Execute(ctx, cmdexec.ToolConfig{
+		Command: name,
+		Args:    args,
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("command execution failed: %w", err)
+	}
+	if result.ExitCode != 0 {
+		return result.Output, result.Stderr, fmt.Errorf("exit status %d", result.ExitCode)
+	}
+	return result.Output, result.Stderr, nil
 }
 
 // MockCall records a single mock call and its result.
