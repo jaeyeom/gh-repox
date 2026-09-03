@@ -1,0 +1,737 @@
+# Code paths → the docs that shadow them.
+# Built from both directions:
+#   1. each README / docs/PROMPT.md / CLAUDE.md section → implementing sources
+#   2. every source file → the sections it would stale
+# Matching is root-anchored. No implicit **/.
+#
+# Left unmatched on purpose:
+#   go.sum — module checksum lockfile
+#   retry.go — only the github package-layout rules; no doc describes
+#     post-create 404 retry
+#   docs/PROMPT.md product-goals / design-principles / milestones /
+#     acceptance-criteria / stricter-org-policy (unimplemented)
+#   duplicate ### Usage / ### Behavior / ### Example invocations headings
+#     (not unique; parent command sections are mapped instead)
+#   PR template Summary/Demo/Flakiness/Reviewer notes (process, not code)
+
+version: 1
+rules:
+  # --- binary entry and exit codes ---
+  - match: ["cmd/gh-repox/main.go"]
+    docs:
+      - path: README.md
+        section: "## Architecture"
+        why: "cmd/gh-repox binary entry point"
+      - path: README.md
+        section: "## Exit Codes"
+        why: "os.Exit maps ExitError.Code and default runtime 1"
+      - path: CLAUDE.md
+        section: "## Project Structure"
+        why: "cmd/gh-repox/ main entry point"
+      - path: docs/PROMPT.md
+        section: "## Extension identity"
+        why: "binary name gh-repox"
+      - path: docs/PROMPT.md
+        section: "## Internal architecture"
+        why: "Go + Cobra package layout"
+      - path: docs/PROMPT.md
+        section: "### Suggested package layout"
+        why: "cmd/gh-repox/"
+      - path: docs/PROMPT.md
+        section: "### Exit codes"
+        why: "main translates ExitError to process status"
+
+  - match: ["internal/cli/exitcode.go"]
+    docs:
+      - path: README.md
+        section: "## Exit Codes"
+        why: "ExitRuntime/InvalidInput/NoAuth/CreateFailed/StrictFailed/CloneFailed"
+      - path: README.md
+        section: "## Strict Mode"
+        why: "strict failures use exit 5/6"
+      - path: docs/PROMPT.md
+        section: "## Error handling"
+        why: "exit codes and partial-success reporting"
+      - path: docs/PROMPT.md
+        section: "### Exit codes"
+        why: "documented 0–6 exit codes"
+
+  # --- CLI: root, flags, config resolution ---
+  - match: ["internal/cli/root.go"]
+    docs:
+      - path: README.md
+        section: "## What It Does"
+        why: "root command identity and subcommands"
+      - path: README.md
+        section: "### Persistent Flags"
+        why: "--config/--host/--owner/--org/--json/--dry-run/--strict"
+      - path: CLAUDE.md
+        section: "## Project Overview"
+        why: "gh repox <subcommand> invocation"
+      - path: docs/PROMPT.md
+        section: "## Overview"
+        why: "gh repox <subcommand> CLI"
+      - path: docs/PROMPT.md
+        section: "## Root command"
+        why: "root command and persistent flags"
+      - path: docs/PROMPT.md
+        section: "### Persistent flags"
+        why: "flags available to all subcommands"
+
+  - match: ["internal/cli/resolve.go"]
+    docs:
+      - path: README.md
+        section: "## Configuration"
+        why: "defaults < file < env < flags merge"
+      - path: README.md
+        section: "### Visibility and Ownership"
+        why: "owner inferred from authenticated gh user"
+      - path: CLAUDE.md
+        section: "## Architecture Notes"
+        why: "config precedence and owner inference"
+      - path: CLAUDE.md
+        section: "## Conventions"
+        why: "owner from gh api user --jq .login"
+      - path: docs/PROMPT.md
+        section: "## Configuration precedence"
+        why: "defaults < YAML < env < flags"
+      - path: docs/PROMPT.md
+        section: "## Owner and org resolution"
+        why: "--org/--owner/config then inferred login"
+      - path: docs/PROMPT.md
+        section: "### Requirement"
+        why: "never hardcode a username"
+      - path: docs/PROMPT.md
+        section: "### Resolution order"
+        why: "org before owner before inferred user"
+      - path: docs/PROMPT.md
+        section: "### Why explicit config merge"
+        why: "defaults, inferred, YAML, env, flags merged in code"
+      - path: docs/PROMPT.md
+        section: "### Authenticated user detection"
+        why: "gh api user --jq .login"
+
+  - match: ["internal/cli/create.go"]
+    docs:
+      - path: README.md
+        section: "### create"
+        why: "create flags, empty-repo default, clone options"
+      - path: README.md
+        section: "## Quick Start"
+        why: "gh repox create my-service"
+      - path: README.md
+        section: "### Repository Initialization"
+        why: "--add-readme/--gitignore/--license empty by default"
+      - path: README.md
+        section: "## Dry-Run Mode"
+        why: "create --dry-run planned gh commands"
+      - path: README.md
+        section: "## Strict Mode"
+        why: "create --strict non-zero on setting/clone failure"
+      - path: docs/PROMPT.md
+        section: "### `gh repox create <name>`"
+        why: "create responsibilities and examples"
+      - path: docs/PROMPT.md
+        section: "## `create` command"
+        why: "usage, flags, notes, example invocations"
+      - path: docs/PROMPT.md
+        section: "### Flags"
+        why: "create-only flag set"
+      - path: docs/PROMPT.md
+        section: "### Notes"
+        why: "empty repo default; clone after configuration"
+      - path: docs/PROMPT.md
+        section: "## Repository creation flow"
+        why: "validate, exist-check, create, post-create, clone, open"
+      - path: docs/PROMPT.md
+        section: "### High-level steps for `create`"
+        why: "parse, load, merge, validate, create, configure, clone, open"
+      - path: docs/PROMPT.md
+        section: "## Clone-after-create behavior"
+        why: "clone after config; --clone-dir/--clone-arg; strict clone exit"
+      - path: docs/PROMPT.md
+        section: "### Clone behavior"
+        why: "clone_after_create default false"
+      - path: docs/PROMPT.md
+        section: "### Goal"
+        why: "optional clone after configuration completes"
+      - path: docs/PROMPT.md
+        section: "### Why after configuration"
+        why: "clone only after create + reconciliation"
+      - path: docs/PROMPT.md
+        section: "### Failure behavior"
+        why: "create can succeed while clone fails; strict fails the workflow"
+      - path: docs/PROMPT.md
+        section: "## Dry-run behavior"
+        why: "create --dry-run prints planned gh commands"
+      - path: docs/PROMPT.md
+        section: "### `create --dry-run`"
+        why: "dry-run planned command list"
+      - path: README.md
+        section: "## Examples"
+        why: "create/clone/config-file examples"
+      - path: README.md
+        section: "### Create a private repo and clone it"
+        why: "create --clone --clone-dir"
+      - path: README.md
+        section: "### Create with a custom config file"
+        why: "create --config"
+
+  - match: ["internal/cli/apply.go"]
+    docs:
+      - path: README.md
+        section: "### apply"
+        why: "apply owner/repo, warnings vs --strict"
+      - path: README.md
+        section: "## Quick Start"
+        why: "gh repox apply owner/repo"
+      - path: README.md
+        section: "## Strict Mode"
+        why: "apply --strict fails on setting errors"
+      - path: README.md
+        section: "## Dry-Run Mode"
+        why: "apply --dry-run previews changes"
+      - path: docs/PROMPT.md
+        section: "### `gh repox apply <owner/repo>`"
+        why: "reconcile existing repo to policy"
+      - path: docs/PROMPT.md
+        section: "## `apply` command"
+        why: "no create/clone; report changed settings"
+      - path: docs/PROMPT.md
+        section: "## Post-creation configuration flow"
+        why: "edit + security settings; strict vs warnings"
+      - path: docs/PROMPT.md
+        section: "### Behavior principles"
+        why: "best-effort post-create/apply unless --strict"
+      - path: docs/PROMPT.md
+        section: "## Dry-run behavior"
+        why: "apply --dry-run shows drift without mutating"
+      - path: docs/PROMPT.md
+        section: "### `apply --dry-run`"
+        why: "show what would change without mutating"
+      - path: README.md
+        section: "## Examples"
+        why: "apply-in-a-loop example"
+      - path: README.md
+        section: "### Apply policy to all repos in an organization"
+        why: "gh repo list loop calling apply --strict"
+
+  - match: ["internal/cli/diff.go"]
+    docs:
+      - path: README.md
+        section: "### diff"
+        why: "current vs desired vs source; --json"
+      - path: README.md
+        section: "## Quick Start"
+        why: "gh repox diff owner/repo"
+      - path: README.md
+        section: "## JSON Output"
+        why: "diff --json machine-readable differences"
+      - path: docs/PROMPT.md
+        section: "### `gh repox diff <owner/repo>`"
+        why: "drift between actual and desired policy"
+      - path: docs/PROMPT.md
+        section: "## `diff` command"
+        why: "current, desired, source of desired value"
+      - path: README.md
+        section: "## Examples"
+        why: "diff --json filtered to status different"
+      - path: README.md
+        section: "### Check what needs to change"
+        why: "diff --json | jq status==different"
+
+  - match: ["internal/cli/config.go"]
+    docs:
+      - path: README.md
+        section: "### config show"
+        why: "effective values without source metadata"
+      - path: README.md
+        section: "### config explain"
+        why: "source of each value including inferred"
+      - path: README.md
+        section: "## Quick Start"
+        why: "gh repox config explain"
+      - path: docs/PROMPT.md
+        section: "### `gh repox config show`"
+        why: "fully resolved config, no sources"
+      - path: docs/PROMPT.md
+        section: "### `gh repox config explain`"
+        why: "source metadata default/config/env/flag/inferred"
+      - path: docs/PROMPT.md
+        section: "## `config show` command"
+        why: "print effective values only"
+      - path: docs/PROMPT.md
+        section: "## `config explain` command"
+        why: "print values with sources"
+      - path: README.md
+        section: "## Examples"
+        why: "config explain --org"
+      - path: README.md
+        section: "### Explain where config values come from"
+        why: "gh repox config explain --org"
+
+  - match: ["internal/cli/cli_test.go"]
+    docs:
+      - path: README.md
+        section: "## Exit Codes"
+        why: "invalid input and bad config are exit 2"
+      - path: README.md
+        section: "## JSON Output"
+        why: "create/apply dry-run JSON shape"
+      - path: docs/PROMPT.md
+        section: "## Testing strategy"
+        why: "CLI exit codes, dry-run JSON, conflicting flags"
+      - path: docs/PROMPT.md
+        section: "### Unit tests"
+        why: "strict vs non-strict, dry-run, conflicting flags"
+      - path: docs/PROMPT.md
+        section: "### Exit codes"
+        why: "exit 2 for invalid repo/config/flags"
+
+  - match: ["internal/cli/**/*.go"]
+    docs:
+      - path: README.md
+        section: "## Commands"
+        why: "create/apply/diff/config subcommands"
+      - path: README.md
+        section: "## Architecture"
+        why: "internal/cli Cobra commands and flag wiring"
+      - path: CLAUDE.md
+        section: "## Project Structure"
+        why: "internal/cli root, create, apply, diff, config"
+      - path: docs/PROMPT.md
+        section: "## Core commands"
+        why: "create/apply/diff/config show/explain"
+      - path: docs/PROMPT.md
+        section: "## CLI interface"
+        why: "root command plus subcommand flag wiring"
+      - path: docs/PROMPT.md
+        section: "### Package responsibilities"
+        why: "cli: cobra commands and flag wiring"
+      - path: docs/PROMPT.md
+        section: "### Recommended command framework"
+        why: "Cobra root + subcommands"
+
+  # --- config loading, defaults, YAML, env ---
+  - match: ["internal/config/config.go"]
+    docs:
+      - path: README.md
+        section: "## Opinionated Defaults"
+        why: "built-in Defaults() for visibility, merge, features, security"
+      - path: README.md
+        section: "### Visibility and Ownership"
+        why: "private true; owner empty until inferred"
+      - path: README.md
+        section: "### Repository Initialization"
+        why: "auto_init/gitignore/license empty"
+      - path: README.md
+        section: "### Merge Policy"
+        why: "squash-only + pr-title-description default"
+      - path: README.md
+        section: "### Repository Features"
+        why: "issues on; wiki/projects off"
+      - path: README.md
+        section: "### Security"
+        why: "dependency graph and alerts on; security updates off"
+      - path: README.md
+        section: "### Config File Locations"
+        why: "--config > .repox.yaml/repox.yaml > ~/.config/gh-repox/config.yaml"
+      - path: README.md
+        section: "### YAML Configuration"
+        why: "yamlConfig keys and field notes"
+      - path: README.md
+        section: "### Environment Variables"
+        why: "REPOX_HOST/OWNER/ORG/PRIVATE/DRY_RUN/STRICT/CLONE_AFTER_CREATE"
+      - path: CLAUDE.md
+        section: "## Architecture Notes"
+        why: "Field[T] source tracking and config discovery order"
+      - path: docs/PROMPT.md
+        section: "## Opinionated defaults"
+        why: "built-in default values"
+      - path: docs/PROMPT.md
+        section: "### Ownership and visibility"
+        why: "owner inferred; visibility private"
+      - path: docs/PROMPT.md
+        section: "### Repository initialization"
+        why: "empty repo; no README/gitignore/license"
+      - path: docs/PROMPT.md
+        section: "### Repository features"
+        why: "has_issues true; wiki/projects false"
+      - path: docs/PROMPT.md
+        section: "### Security defaults"
+        why: "dependency_graph and alerts on; security updates off"
+      - path: docs/PROMPT.md
+        section: "## YAML schema"
+        why: "file shape and field notes"
+      - path: docs/PROMPT.md
+        section: "### Example config"
+        why: "github/repo/merge/security/clone/behavior keys"
+      - path: docs/PROMPT.md
+        section: "### Field notes"
+        why: "owner/org/auto_init/template/clone fields"
+      - path: docs/PROMPT.md
+        section: "## Config file discovery"
+        why: "single file: --config, repo-local, user config"
+      - path: docs/PROMPT.md
+        section: "## Environment variable support"
+        why: "explicit REPOX_* set"
+      - path: docs/PROMPT.md
+        section: "## Config precedence and explainability"
+        why: "Source default/config/env/flag/inferred on Field"
+
+  - match: ["internal/config/config_test.go"]
+    docs:
+      - path: docs/PROMPT.md
+        section: "## Testing strategy"
+        why: "config loading and precedence tests"
+      - path: docs/PROMPT.md
+        section: "### Unit tests"
+        why: "config loading, precedence merging, source tracking"
+      - path: CLAUDE.md
+        section: "## Conventions"
+        why: "table-driven tests with t.TempDir/t.Setenv"
+
+  - match: ["internal/config/**/*.go"]
+    docs:
+      - path: README.md
+        section: "## Architecture"
+        why: "internal/config loading, merging, source tracking"
+      - path: CLAUDE.md
+        section: "## Project Structure"
+        why: "internal/config YAML, env, defaults, Field[T]"
+      - path: docs/PROMPT.md
+        section: "### Package responsibilities"
+        why: "config: load YAML, env, and defaults; resolve precedence"
+
+  # --- policy model ---
+  - match: ["internal/policy/policy.go", "internal/policy/policy_test.go"]
+    docs:
+      - path: README.md
+        section: "## Architecture"
+        why: "DesiredPolicy and ActualState models"
+      - path: README.md
+        section: "## Limitations"
+        why: "v1 policy surface (no branch protection/teams)"
+      - path: CLAUDE.md
+        section: "## Architecture Notes"
+        why: "DesiredPolicy shared by create, apply, and diff"
+      - path: docs/PROMPT.md
+        section: "## Internal policy model"
+        why: "DesiredPolicy fields used by create/apply/diff"
+      - path: docs/PROMPT.md
+        section: "## Fetching current repo state"
+        why: "ActualState including pointer booleans"
+      - path: docs/PROMPT.md
+        section: "## Non-goals"
+        why: "v1 does not cover every GitHub setting"
+
+  - match: ["internal/policy/squash.go", "internal/policy/squash_test.go"]
+    docs:
+      - path: README.md
+        section: "### Merge Policy"
+        why: "allowed squash_merge_commit_message presets"
+      - path: docs/PROMPT.md
+        section: "### Merge policy"
+        why: "default/pr-title/pr-title-commits/pr-title-description mapping"
+      - path: docs/PROMPT.md
+        section: "## Opinionated defaults"
+        why: "squash_merge_commit_message default and allowed values"
+
+  - match: ["internal/policy/**/*.go"]
+    docs:
+      - path: CLAUDE.md
+        section: "## Project Structure"
+        why: "internal/policy DesiredPolicy and ActualState"
+      - path: docs/PROMPT.md
+        section: "### Package responsibilities"
+        why: "policy: build final desired policy model"
+
+  # --- GitHub CLI / API ---
+  - match: ["internal/github/github.go"]
+    docs:
+      - path: README.md
+        section: "### create"
+        why: "gh repo create/edit/clone args and template flow"
+      - path: README.md
+        section: "### Security"
+        why: "vulnerability alerts, dependency graph, automated security fixes"
+      - path: README.md
+        section: "## Dry-Run Mode"
+        why: "PlannedCommands / PlannedSecurityCommands"
+      - path: README.md
+        section: "## Limitations"
+        why: "security settings coverage and missing branch protection"
+      - path: docs/PROMPT.md
+        section: "### Repo creation details"
+        why: "gh repo create empty private repo; no init flags unless requested"
+      - path: docs/PROMPT.md
+        section: "### Create command logic"
+        why: "template vs gh repo create"
+      - path: docs/PROMPT.md
+        section: "### Repo existence check"
+        why: "gh repo view before create"
+      - path: docs/PROMPT.md
+        section: "### Merge and repo settings"
+        why: "gh repo edit merge/features; squash message via REST"
+      - path: docs/PROMPT.md
+        section: "### Security settings"
+        why: "gh api for settings not on gh repo edit"
+      - path: docs/PROMPT.md
+        section: "### Command form"
+        why: "gh repo clone OWNER/REPO [-- extra args]"
+      - path: docs/PROMPT.md
+        section: "## Fetching current repo state"
+        why: "FetchRepoState from gh repo view / gh api"
+      - path: docs/PROMPT.md
+        section: "### Host awareness"
+        why: "HostArgs applied to all gh/gh api calls"
+      - path: docs/PROMPT.md
+        section: "### Authenticated user detection"
+        why: "GetAuthenticatedUser via gh api user"
+
+  - match: ["internal/github/github_test.go"]
+    docs:
+      - path: docs/PROMPT.md
+        section: "## Testing strategy"
+        why: "unit tests for gh command generation"
+      - path: docs/PROMPT.md
+        section: "### Unit tests"
+        why: "create/edit/clone command generation and fetch state"
+      - path: docs/PROMPT.md
+        section: "### Integration tests"
+        why: "mocked runner for auth, exists, edit, security, clone"
+
+  - match: ["internal/github/integration_test.go"]
+    docs:
+      - path: docs/PROMPT.md
+        section: "### Integration tests"
+        why: "live create-and-delete against GitHub"
+      - path: docs/PROMPT.md
+        section: "### Manual tests"
+        why: "create/apply/diff against a real repo"
+
+  - match: ["internal/github/**/*.go"]
+    docs:
+      - path: README.md
+        section: "## Architecture"
+        why: "internal/github gh CLI and API interactions"
+      - path: CLAUDE.md
+        section: "## Project Structure"
+        why: "internal/github repo CRUD and security settings"
+      - path: docs/PROMPT.md
+        section: "### Package responsibilities"
+        why: "github: gh/gh api command construction"
+
+  # --- exec, diff, output, validate ---
+  - match: ["internal/exec/**/*.go"]
+    docs:
+      - path: README.md
+        section: "## Architecture"
+        why: "internal/exec subprocess runner"
+      - path: CLAUDE.md
+        section: "## Project Structure"
+        why: "Runner interface (real + mock)"
+      - path: CLAUDE.md
+        section: "## Architecture Notes"
+        why: "all gh commands go through exec.Runner; MockRunner in tests"
+      - path: docs/PROMPT.md
+        section: "## Execution abstraction"
+        why: "Runner.Run(ctx, name, args) stdout/stderr"
+      - path: docs/PROMPT.md
+        section: "### Package responsibilities"
+        why: "exec: subprocess runner abstraction"
+      - path: docs/PROMPT.md
+        section: "### Integration tests"
+        why: "mocked runner for gh interactions"
+
+  - match: ["internal/diff/**/*.go"]
+    docs:
+      - path: README.md
+        section: "### diff"
+        why: "current/desired/source/status comparison"
+      - path: README.md
+        section: "## Architecture"
+        why: "internal/diff actual vs desired"
+      - path: CLAUDE.md
+        section: "## Project Structure"
+        why: "internal/diff compare desired vs actual"
+      - path: docs/PROMPT.md
+        section: "## Diff model"
+        why: "DiffEntry field/current/desired/source/status"
+      - path: docs/PROMPT.md
+        section: "### Package responsibilities"
+        why: "diff: compare actual vs desired settings"
+      - path: docs/PROMPT.md
+        section: "### Unit tests"
+        why: "diff generation"
+
+  - match: ["internal/output/output.go", "internal/output/output_test.go"]
+    docs:
+      - path: README.md
+        section: "## JSON Output"
+        why: "PrintJSON for create/diff/config"
+      - path: README.md
+        section: "## Dry-Run Mode"
+        why: "PrintDryRun planned command list"
+      - path: docs/PROMPT.md
+        section: "## Output design"
+        why: "human create/apply/diff summaries"
+      - path: docs/PROMPT.md
+        section: "### Default human output"
+        why: "PrintCreateHuman / PrintApplyHuman layout"
+      - path: docs/PROMPT.md
+        section: "### JSON output"
+        why: "CreateResult / DiffResult / ApplyResult JSON"
+
+  - match: ["internal/output/**/*.go"]
+    docs:
+      - path: README.md
+        section: "## Architecture"
+        why: "internal/output human and JSON formatters"
+      - path: CLAUDE.md
+        section: "## Project Structure"
+        why: "internal/output human-readable and JSON formatters"
+      - path: docs/PROMPT.md
+        section: "### Package responsibilities"
+        why: "output: human and JSON output"
+
+  - match: ["internal/validate/**/*.go"]
+    docs:
+      - path: README.md
+        section: "## Exit Codes"
+        why: "invalid owner/repo/policy is exit 2"
+      - path: README.md
+        section: "## Architecture"
+        why: "internal/validate semantic validation"
+      - path: CLAUDE.md
+        section: "## Project Structure"
+        why: "ParseOwnerRepo, ValidateCreate, ValidateApply"
+      - path: docs/PROMPT.md
+        section: "### Package responsibilities"
+        why: "validate: semantic validation"
+      - path: docs/PROMPT.md
+        section: "## `apply` command"
+        why: "owner/repo argument parsing"
+      - path: docs/PROMPT.md
+        section: "### Merge policy"
+        why: "squash_merge_commit_message allowed values"
+
+  # --- build, lint, CI, release ---
+  - match: ["Makefile"]
+    docs:
+      - path: README.md
+        section: "## Development"
+        why: "make build/test/format/lint/check/all/install"
+      - path: README.md
+        section: "### Build"
+        why: "make build local gh-repox binary"
+      - path: README.md
+        section: "### Test"
+        why: "make test / coverage / coverage-html"
+      - path: README.md
+        section: "### Format and Lint"
+        why: "make format / vet / check / all"
+      - path: README.md
+        section: "### Install Locally"
+        why: "make install to GOPATH/bin"
+      - path: README.md
+        section: "## Releasing"
+        why: "make release-check before tagging"
+      - path: README.md
+        section: "### Release-readiness check"
+        why: "make release-check cross-compile platforms"
+      - path: README.md
+        section: "### Local builds vs public installation"
+        why: "make build vs release-check vs tagged release"
+      - path: CLAUDE.md
+        section: "## Build & Test Commands"
+        why: "make all/check/build/test/coverage/format/lint"
+      - path: .github/pull_request_template.md
+        section: "## Test plan"
+        why: "make check is green"
+
+  - match: [".golangci.yml"]
+    docs:
+      - path: README.md
+        section: "### Format and Lint"
+        why: "golangci-lint config used by make lint"
+      - path: CLAUDE.md
+        section: "## Build & Test Commands"
+        why: "make lint / check invoke golangci-lint"
+
+  - match: ["go.mod"]
+    docs:
+      - path: README.md
+        section: "### Prerequisites"
+        why: "Go 1.26 or later"
+      - path: CLAUDE.md
+        section: "## Conventions"
+        why: "Go 1.26+; cobra and yaml.v3"
+      - path: CLAUDE.md
+        section: "## Build & Test Commands"
+        why: "go mod tidy"
+      - path: docs/PROMPT.md
+        section: "### Recommended language"
+        why: "Go"
+      - path: docs/PROMPT.md
+        section: "### Go libraries"
+        why: "Cobra and gopkg.in/yaml.v3"
+      - path: docs/PROMPT.md
+        section: "## Suggested implementation details"
+        why: "Cobra + yaml.v3; explicit merge, no heavy config magic"
+
+  - match: [".gitignore"]
+    docs:
+      - path: README.md
+        section: "### Local builds vs public installation"
+        why: "./gh-repox, dist/, coverage artifacts are git-ignored"
+
+  - match: [".github/workflows/ci.yml"]
+    docs:
+      - path: README.md
+        section: "### Format and Lint"
+        why: "CI runs make check"
+      - path: README.md
+        section: "### Prerequisites"
+        why: "CI Go 1.26 matrix"
+      - path: CLAUDE.md
+        section: "## Build & Test Commands"
+        why: "make check is the CI-safe target"
+
+  - match: [".github/workflows/release.yml"]
+    docs:
+      - path: README.md
+        section: "## Installation"
+        why: "public install is gh extension install of release binaries"
+      - path: README.md
+        section: "## Releasing"
+        why: "tag-driven GitHub release workflow"
+      - path: README.md
+        section: "### Publishing a release"
+        why: "v* tag → cross-compile → gh release create"
+      - path: README.md
+        section: "### Local builds vs public installation"
+        why: "GitHub release binaries are the public artifact"
+
+  - match:
+      - ".github/workflows/strip-pr-html-comments.yml"
+      - ".github/pull_request_template.md"
+    docs:
+      - path: CLAUDE.md
+        section: "## Pull requests"
+        why: "do not copy template HTML comments; strip workflow backstop"
+
+  - match: ["**/*_test.go"]
+    docs:
+      - path: docs/PROMPT.md
+        section: "## Testing strategy"
+        why: "unit and integration tests under internal/"
+      - path: README.md
+        section: "### Test"
+        why: "go test ./... via make test"
+
+  - match: ["LICENSE"]
+    docs:
+      - path: README.md
+        section: "## License"
+        why: "MIT"
