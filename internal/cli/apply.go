@@ -38,6 +38,9 @@ func newApplyCmd() *cobra.Command {
 
 			p := policy.FromConfig(cfg, repo)
 			p.Owner = owner
+			if err := validate.Policy(p); err != nil {
+				return exitErrorf(ExitInvalidInput, "validate apply: %w", err)
+			}
 			fullName := p.FullName()
 
 			runner := &exec.RealRunner{}
@@ -87,6 +90,10 @@ func newApplyCmd() *cobra.Command {
 				)
 			}
 
+			squashApplied, squashWarnings := applySquashMergeCommitMessage(ctx, client, fullName, p.SquashMergeCommitMessage)
+			result.Applied = append(result.Applied, squashApplied...)
+			result.Warnings = append(result.Warnings, squashWarnings...)
+
 			// Security settings
 			secApplied, secWarnings := client.ApplySecuritySettings(ctx, fullName, p, false)
 			result.Applied = append(result.Applied, secApplied...)
@@ -117,6 +124,9 @@ func printApplyDryRun(fullName string, p *policy.DesiredPolicy, cfg *config.Conf
 	cmds := []string{
 		output.FormatCommand("gh", editArgs...),
 	}
+	if cmd := ghclient.PlannedSquashMergeCommitMessageCommand(fullName, p.SquashMergeCommitMessage, cfg.Host.Value); cmd != "" {
+		cmds = append(cmds, cmd)
+	}
 	cmds = append(cmds, ghclient.PlannedSecurityCommands(fullName, p, cfg.Host.Value)...)
 	if flagJSON {
 		result := &output.DryRunResult{
@@ -133,6 +143,13 @@ func printApplyDryRun(fullName string, p *policy.DesiredPolicy, cfg *config.Conf
 	header := fmt.Sprintf("Dry run: gh repox apply %s\n\nWould apply resolved policy to %s", fullName, fullName)
 	output.PrintDryRun(os.Stdout, header, cmds)
 	return nil
+}
+
+func applySquashMergeCommitMessage(ctx context.Context, client *ghclient.Client, fullName, preset string) (applied []string, warnings []string) {
+	if err := client.SetSquashMergeCommitMessage(ctx, fullName, preset); err != nil {
+		return nil, []string{err.Error()}
+	}
+	return []string{"squash merge commit message: " + preset}, nil
 }
 
 func enabledStr(b bool) string {

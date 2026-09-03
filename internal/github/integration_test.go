@@ -52,16 +52,17 @@ func TestIntegrationCreateAndDelete(t *testing.T) {
 
 	// 2. Create the repo.
 	p := &policy.DesiredPolicy{
-		Owner:               login,
-		Repo:                repoName,
-		Private:             true,
-		HasIssues:           true,
-		HasWiki:             false,
-		AllowSquashMerge:    true,
-		AllowMergeCommit:    false,
-		AllowRebaseMerge:    false,
-		AllowAutoMerge:      false,
-		DeleteBranchOnMerge: true,
+		Owner:                    login,
+		Repo:                     repoName,
+		Private:                  true,
+		HasIssues:                true,
+		HasWiki:                  false,
+		AllowSquashMerge:         true,
+		AllowMergeCommit:         false,
+		AllowRebaseMerge:         false,
+		AllowAutoMerge:           false,
+		DeleteBranchOnMerge:      true,
+		SquashMergeCommitMessage: "pr-title-description",
 	}
 
 	url, err := client.CreateRepo(ctx, p)
@@ -112,6 +113,13 @@ func TestIntegrationCreateAndDelete(t *testing.T) {
 	}
 	if state.DeleteBranchOnMerge != true {
 		t.Error("expected delete_branch_on_merge=true")
+	}
+	if state.SquashMergeCommitMessage == nil || *state.SquashMergeCommitMessage != "pr-title-description" {
+		got := "<nil>"
+		if state.SquashMergeCommitMessage != nil {
+			got = *state.SquashMergeCommitMessage
+		}
+		t.Errorf("expected squash_merge_commit_message=pr-title-description, got %s", got)
 	}
 
 	t.Logf("integration smoke test passed for %s", fullName)

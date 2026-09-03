@@ -49,6 +49,21 @@ func Create(p *policy.DesiredPolicy) error {
 	if p.Template != "" && (p.AutoInit || p.Gitignore != "" || p.License != "") {
 		return fmt.Errorf("cannot use --template with --add-readme, --gitignore, or --license")
 	}
+	if err := squashMergeCommitMessage(p.SquashMergeCommitMessage); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Policy validates fields on a resolved desired policy.
+func Policy(p *policy.DesiredPolicy) error {
+	return squashMergeCommitMessage(p.SquashMergeCommitMessage)
+}
+
+func squashMergeCommitMessage(v string) error {
+	if !policy.ValidSquashCommitMessage(v) {
+		return fmt.Errorf("invalid squash_merge_commit_message %q: must be one of default, pr-title, pr-title-commits, pr-title-description", v)
+	}
 	return nil
 }
 

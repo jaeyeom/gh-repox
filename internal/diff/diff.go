@@ -72,6 +72,20 @@ func Compare(desired *policy.DesiredPolicy, actual *policy.ActualState, cfg *con
 		})
 	}
 
+	addOptString := func(field string, current *string, desired string, source config.Source) {
+		if current == nil {
+			entries = append(entries, Entry{
+				Field:         field,
+				Current:       nil,
+				Desired:       desired,
+				DesiredSource: string(source),
+				Status:        StatusUnknown,
+			})
+			return
+		}
+		addString(field, *current, desired, source)
+	}
+
 	addBool("private", actual.Private, desired.Private, cfg.Private.Source)
 	addString("description", actual.Description, desired.Description, cfg.Description.Source)
 	addString("homepage", actual.Homepage, desired.Homepage, cfg.Homepage.Source)
@@ -83,6 +97,7 @@ func Compare(desired *policy.DesiredPolicy, actual *policy.ActualState, cfg *con
 	addBool("allow_rebase_merge", actual.AllowRebaseMerge, desired.AllowRebaseMerge, cfg.AllowRebaseMerge.Source)
 	addOptBool("allow_auto_merge", actual.AllowAutoMerge, desired.AllowAutoMerge, cfg.AllowAutoMerge.Source)
 	addBool("delete_branch_on_merge", actual.DeleteBranchOnMerge, desired.DeleteBranchOnMerge, cfg.DeleteBranchOnMerge.Source)
+	addOptString("squash_merge_commit_message", actual.SquashMergeCommitMessage, desired.SquashMergeCommitMessage, cfg.SquashMergeCommitMessage.Source)
 	addOptBool("dependency_graph", actual.DependencyGraph, desired.DependencyGraph, cfg.DependencyGraph.Source)
 	addOptBool("dependabot_alerts", actual.DependabotAlerts, desired.DependabotAlerts, cfg.DependabotAlerts.Source)
 	addOptBool("dependabot_security_updates", actual.DependabotSecurityUpdates, desired.DependabotSecurityUpdates, cfg.DependabotSecurityUpdates.Source)

@@ -22,11 +22,12 @@ type DesiredPolicy struct {
 	License   string
 	Template  string
 
-	AllowSquashMerge    bool
-	AllowMergeCommit    bool
-	AllowRebaseMerge    bool
-	AllowAutoMerge      bool
-	DeleteBranchOnMerge bool
+	AllowSquashMerge         bool
+	AllowMergeCommit         bool
+	AllowRebaseMerge         bool
+	AllowAutoMerge           bool
+	DeleteBranchOnMerge      bool
+	SquashMergeCommitMessage string
 
 	DependencyGraph           bool
 	DependabotAlerts          bool
@@ -46,11 +47,12 @@ type ActualState struct {
 	HasWiki     bool
 	HasProjects bool
 
-	AllowSquashMerge    bool
-	AllowMergeCommit    bool
-	AllowRebaseMerge    bool
-	AllowAutoMerge      *bool
-	DeleteBranchOnMerge bool
+	AllowSquashMerge         bool
+	AllowMergeCommit         bool
+	AllowRebaseMerge         bool
+	AllowAutoMerge           *bool
+	DeleteBranchOnMerge      bool
+	SquashMergeCommitMessage *string
 
 	DependencyGraph           *bool
 	DependabotAlerts          *bool
@@ -81,11 +83,12 @@ func FromConfig(cfg *config.Config, repoName string) *DesiredPolicy {
 		License:   cfg.License.Value,
 		Template:  cfg.Template.Value,
 
-		AllowSquashMerge:    cfg.AllowSquashMerge.Value,
-		AllowMergeCommit:    cfg.AllowMergeCommit.Value,
-		AllowRebaseMerge:    cfg.AllowRebaseMerge.Value,
-		AllowAutoMerge:      cfg.AllowAutoMerge.Value,
-		DeleteBranchOnMerge: cfg.DeleteBranchOnMerge.Value,
+		AllowSquashMerge:         cfg.AllowSquashMerge.Value,
+		AllowMergeCommit:         cfg.AllowMergeCommit.Value,
+		AllowRebaseMerge:         cfg.AllowRebaseMerge.Value,
+		AllowAutoMerge:           cfg.AllowAutoMerge.Value,
+		DeleteBranchOnMerge:      cfg.DeleteBranchOnMerge.Value,
+		SquashMergeCommitMessage: cfg.SquashMergeCommitMessage.Value,
 
 		DependencyGraph:           cfg.DependencyGraph.Value,
 		DependabotAlerts:          cfg.DependabotAlerts.Value,

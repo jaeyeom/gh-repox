@@ -20,6 +20,15 @@ const (
 	SourceInferred Source = "inferred"
 )
 
+// Squash merge commit message presets matching GitHub's UI and
+// `gh repo edit --squash-merge-commit-message`.
+const (
+	SquashCommitMessageDefault            = "default"
+	SquashCommitMessagePRTitle            = "pr-title"
+	SquashCommitMessagePRTitleCommits     = "pr-title-commits"
+	SquashCommitMessagePRTitleDescription = "pr-title-description"
+)
+
 // Field holds a value and its source.
 type Field[T any] struct {
 	Value  T
@@ -54,11 +63,12 @@ type Config struct {
 	Template  Field[string]
 
 	// Merge settings
-	AllowSquashMerge    Field[bool]
-	AllowMergeCommit    Field[bool]
-	AllowRebaseMerge    Field[bool]
-	AllowAutoMerge      Field[bool]
-	DeleteBranchOnMerge Field[bool]
+	AllowSquashMerge         Field[bool]
+	AllowMergeCommit         Field[bool]
+	AllowRebaseMerge         Field[bool]
+	AllowAutoMerge           Field[bool]
+	DeleteBranchOnMerge      Field[bool]
+	SquashMergeCommitMessage Field[string]
 
 	// Security settings
 	DependencyGraph           Field[bool]
@@ -96,11 +106,12 @@ type yamlConfig struct {
 		Template    *string `yaml:"template"`
 	} `yaml:"repo"`
 	Merge struct {
-		AllowSquashMerge    *bool `yaml:"allow_squash_merge"`
-		AllowMergeCommit    *bool `yaml:"allow_merge_commit"`
-		AllowRebaseMerge    *bool `yaml:"allow_rebase_merge"`
-		AllowAutoMerge      *bool `yaml:"allow_auto_merge"`
-		DeleteBranchOnMerge *bool `yaml:"delete_branch_on_merge"`
+		AllowSquashMerge         *bool   `yaml:"allow_squash_merge"`
+		AllowMergeCommit         *bool   `yaml:"allow_merge_commit"`
+		AllowRebaseMerge         *bool   `yaml:"allow_rebase_merge"`
+		AllowAutoMerge           *bool   `yaml:"allow_auto_merge"`
+		DeleteBranchOnMerge      *bool   `yaml:"delete_branch_on_merge"`
+		SquashMergeCommitMessage *string `yaml:"squash_merge_commit_message"`
 	} `yaml:"merge"`
 	Security struct {
 		DependencyGraph           *bool `yaml:"dependency_graph"`
@@ -143,6 +154,7 @@ func Defaults() *Config {
 	c.AllowRebaseMerge.Set(false, SourceDefault)
 	c.AllowAutoMerge.Set(true, SourceDefault)
 	c.DeleteBranchOnMerge.Set(true, SourceDefault)
+	c.SquashMergeCommitMessage.Set(SquashCommitMessagePRTitleDescription, SourceDefault)
 
 	c.DependencyGraph.Set(true, SourceDefault)
 	c.DependabotAlerts.Set(true, SourceDefault)
@@ -263,6 +275,9 @@ func (c *Config) applyMerge(yc yamlConfig) {
 	if yc.Merge.DeleteBranchOnMerge != nil {
 		c.DeleteBranchOnMerge.Set(*yc.Merge.DeleteBranchOnMerge, SourceConfig)
 	}
+	if yc.Merge.SquashMergeCommitMessage != nil {
+		c.SquashMergeCommitMessage.Set(*yc.Merge.SquashMergeCommitMessage, SourceConfig)
+	}
 }
 
 func (c *Config) applySecurity(yc yamlConfig) {
@@ -355,6 +370,7 @@ func (c *Config) Entries() []Entry {
 		{"allow_rebase_merge", c.AllowRebaseMerge.Value, c.AllowRebaseMerge.Source},
 		{"allow_auto_merge", c.AllowAutoMerge.Value, c.AllowAutoMerge.Source},
 		{"delete_branch_on_merge", c.DeleteBranchOnMerge.Value, c.DeleteBranchOnMerge.Source},
+		{"squash_merge_commit_message", c.SquashMergeCommitMessage.Value, c.SquashMergeCommitMessage.Source},
 		{"dependency_graph", c.DependencyGraph.Value, c.DependencyGraph.Source},
 		{"dependabot_alerts", c.DependabotAlerts.Value, c.DependabotAlerts.Source},
 		{"dependabot_security_updates", c.DependabotSecurityUpdates.Value, c.DependabotSecurityUpdates.Source},

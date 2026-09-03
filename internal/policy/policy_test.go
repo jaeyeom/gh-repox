@@ -27,6 +27,9 @@ func TestFromConfig(t *testing.T) {
 	if p.Description != "test repo" {
 		t.Errorf("got description=%q", p.Description)
 	}
+	if p.SquashMergeCommitMessage != config.SquashCommitMessagePRTitleDescription {
+		t.Errorf("got squash_merge_commit_message=%q, want %q", p.SquashMergeCommitMessage, config.SquashCommitMessagePRTitleDescription)
+	}
 }
 
 func TestFromConfig_OrgOverridesOwner(t *testing.T) {

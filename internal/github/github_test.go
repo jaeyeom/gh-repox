@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -179,6 +180,34 @@ func TestEditRepoArgs(t *testing.T) {
 	}
 }
 
+func TestEditRepo_DoesNotSetSquashMergeCommitMessage(t *testing.T) {
+	p := &policy.DesiredPolicy{
+		Owner:                    "user",
+		Repo:                     "repo",
+		Private:                  true,
+		SquashMergeCommitMessage: "pr-title-description",
+	}
+	mock := &exec.MockRunner{
+		Responses: []exec.MockCall{
+			{Stdout: ""}, // gh repo edit
+		},
+	}
+	c := NewClient(mock, "")
+	if err := c.EditRepo(context.Background(), "user/repo", p); err != nil {
+		t.Fatal(err)
+	}
+	if len(mock.Calls) != 1 {
+		t.Fatalf("got %d calls, want 1 (gh repo edit only)", len(mock.Calls))
+	}
+	editJoined := strings.Join(mock.Calls[0].Args, " ")
+	if !strings.Contains(editJoined, "repo edit user/repo") {
+		t.Errorf("call should be gh repo edit, got: %s", editJoined)
+	}
+	if strings.Contains(editJoined, "squash_merge_commit") {
+		t.Errorf("EditRepo should not PATCH squash commit message, got: %s", editJoined)
+	}
+}
+
 func TestCloneRepoArgs(t *testing.T) {
 	args := CloneRepoArgs("user/repo", "", nil)
 	if len(args) != 3 {
@@ -245,6 +274,65 @@ func TestRepoExists_Error(t *testing.T) {
 	}
 }
 
+func TestSquashMergeCommitMessageJSON(t *testing.T) {
+	body, err := squashMergeCommitMessageJSON("pr-title-description")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]string
+	if err := json.Unmarshal([]byte(body), &payload); err != nil {
+		t.Fatalf("not JSON: %v\n%s", err, body)
+	}
+	if payload["squash_merge_commit_title"] != "PR_TITLE" {
+		t.Errorf("title = %q, want PR_TITLE", payload["squash_merge_commit_title"])
+	}
+	if payload["squash_merge_commit_message"] != "PR_BODY" {
+		t.Errorf("message = %q, want PR_BODY", payload["squash_merge_commit_message"])
+	}
+	if _, err := squashMergeCommitMessageJSON("bogus"); err == nil {
+		t.Fatal("expected error for invalid preset")
+	}
+}
+
+func TestSetSquashMergeCommitMessage(t *testing.T) {
+	mock := &exec.MockRunner{
+		Responses: []exec.MockCall{{Stdout: ""}},
+	}
+	c := NewClient(mock, "")
+	if err := c.SetSquashMergeCommitMessage(context.Background(), "user/repo", "pr-title-description"); err != nil {
+		t.Fatal(err)
+	}
+	if len(mock.Calls) != 1 {
+		t.Fatalf("got %d calls, want 1", len(mock.Calls))
+	}
+	args := mock.Calls[0].Args
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "api --method PATCH /repos/user/repo") {
+		t.Errorf("expected PATCH /repos/user/repo, got: %s", joined)
+	}
+	hasInput := false
+	for _, a := range args {
+		if a == "--input" {
+			hasInput = true
+			break
+		}
+	}
+	if !hasInput {
+		t.Error("expected --input for PATCH body")
+	}
+}
+
+func TestSetSquashMergeCommitMessage_Invalid(t *testing.T) {
+	mock := &exec.MockRunner{}
+	c := NewClient(mock, "")
+	if err := c.SetSquashMergeCommitMessage(context.Background(), "user/repo", "bogus"); err == nil {
+		t.Fatal("expected error for invalid preset")
+	}
+	if len(mock.Calls) != 0 {
+		t.Errorf("should not call gh for invalid preset, got %d calls", len(mock.Calls))
+	}
+}
+
 func TestPlannedCommands(t *testing.T) {
 	p := &policy.DesiredPolicy{
 		Owner:            "user",
@@ -257,6 +345,22 @@ func TestPlannedCommands(t *testing.T) {
 	cmds := PlannedCommands(p, "")
 	if len(cmds) < 3 {
 		t.Errorf("expected at least 3 commands, got %d", len(cmds))
+	}
+}
+
+func TestPlannedCommands_SquashMergeCommitMessage(t *testing.T) {
+	p := &policy.DesiredPolicy{
+		Owner:                    "user",
+		Repo:                     "my-repo",
+		Private:                  true,
+		AllowSquashMerge:         true,
+		SquashMergeCommitMessage: "pr-title-description",
+	}
+	cmds := PlannedCommands(p, "")
+	joined := strings.Join(cmds, "\n")
+	want := `echo '{"squash_merge_commit_title":"PR_TITLE","squash_merge_commit_message":"PR_BODY"}' | gh api --method PATCH /repos/user/my-repo --input -`
+	if !strings.Contains(joined, want) {
+		t.Errorf("expected planned commands to contain squash commit message PATCH, got:\n%s", joined)
 	}
 }
 
@@ -366,9 +470,10 @@ func TestFetchRepoState(t *testing.T) {
 		Responses: []exec.MockCall{
 			{Stdout: jsonResp},  // gh repo view --json
 			{Stdout: "false\n"}, // fetchAllowAutoMerge via REST API
-			{Stdout: ""},        // fetchVulnerabilityAlertsEnabled
-			{Stdout: ""},        // fetchDependencyGraphEnabled
-			{Stdout: ""},        // fetchAutomatedSecurityFixesEnabled
+			{Stdout: `{"title":"COMMIT_OR_PR_TITLE","message":"COMMIT_MESSAGES"}`}, // fetchSquashMergeCommitMessage
+			{Stdout: ""}, // fetchVulnerabilityAlertsEnabled
+			{Stdout: ""}, // fetchDependencyGraphEnabled
+			{Stdout: ""}, // fetchAutomatedSecurityFixesEnabled
 		},
 	}
 	c := NewClient(mock, "")
@@ -410,8 +515,9 @@ func TestFetchRepoState_AutomatedSecurityFixes404MeansDisabled(t *testing.T) {
 		Responses: []exec.MockCall{
 			{Stdout: jsonResp},  // gh repo view --json
 			{Stdout: "false\n"}, // fetchAllowAutoMerge
-			{Stdout: ""},        // fetchVulnerabilityAlertsEnabled
-			{Stdout: ""},        // fetchDependencyGraphEnabled
+			{Stdout: `{"title":"PR_TITLE","message":"BLANK"}`}, // fetchSquashMergeCommitMessage
+			{Stdout: ""}, // fetchVulnerabilityAlertsEnabled
+			{Stdout: ""}, // fetchDependencyGraphEnabled
 			{Stderr: "HTTP 404: Not Found", Err: fmt.Errorf("exit 1")}, // fetchAutomatedSecurityFixesEnabled 404
 		},
 	}
@@ -445,8 +551,9 @@ func TestFetchRepoState_AutomatedSecurityFixes403MeansUnknown(t *testing.T) {
 		Responses: []exec.MockCall{
 			{Stdout: jsonResp},  // gh repo view --json
 			{Stdout: "false\n"}, // fetchAllowAutoMerge
-			{Stdout: ""},        // fetchVulnerabilityAlertsEnabled
-			{Stdout: ""},        // fetchDependencyGraphEnabled
+			{Stdout: `{"title":"PR_TITLE","message":"BLANK"}`}, // fetchSquashMergeCommitMessage
+			{Stdout: ""}, // fetchVulnerabilityAlertsEnabled
+			{Stdout: ""}, // fetchDependencyGraphEnabled
 			{Stderr: "403 Forbidden", Err: fmt.Errorf("exit 1")}, // fetchAutomatedSecurityFixesEnabled permission error
 		},
 	}
@@ -457,6 +564,75 @@ func TestFetchRepoState_AutomatedSecurityFixes403MeansUnknown(t *testing.T) {
 	}
 	if state.DependabotSecurityUpdates != nil {
 		t.Errorf("DependabotSecurityUpdates should be nil on permission error, got %v", *state.DependabotSecurityUpdates)
+	}
+}
+
+func TestFetchRepoState_SquashMergeCommitMessage(t *testing.T) {
+	jsonResp := `{
+		"isPrivate": true,
+		"description": "test",
+		"homepageUrl": "",
+		"hasIssuesEnabled": true,
+		"hasWikiEnabled": false,
+		"hasProjectsEnabled": false,
+		"squashMergeAllowed": true,
+		"mergeCommitAllowed": false,
+		"rebaseMergeAllowed": false,
+		"deleteBranchOnMerge": true
+	}`
+	mock := &exec.MockRunner{
+		Responses: []exec.MockCall{
+			{Stdout: jsonResp},  // gh repo view --json
+			{Stdout: "false\n"}, // fetchAllowAutoMerge
+			{Stdout: `{"title":"PR_TITLE","message":"PR_BODY"}`}, // fetchSquashMergeCommitMessage
+			{Stdout: ""}, // fetchVulnerabilityAlertsEnabled
+			{Stdout: ""}, // fetchDependencyGraphEnabled
+			{Stdout: ""}, // fetchAutomatedSecurityFixesEnabled
+		},
+	}
+	c := NewClient(mock, "")
+	state, err := c.FetchRepoState(context.Background(), "user/repo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.SquashMergeCommitMessage == nil {
+		t.Fatal("squash merge commit message should not be nil")
+	}
+	if *state.SquashMergeCommitMessage != "pr-title-description" {
+		t.Errorf("got squash_merge_commit_message=%q, want pr-title-description", *state.SquashMergeCommitMessage)
+	}
+}
+
+func TestFetchRepoState_SquashMergeCommitMessageUnknownOnError(t *testing.T) {
+	jsonResp := `{
+		"isPrivate": false,
+		"description": "",
+		"homepageUrl": "",
+		"hasIssuesEnabled": true,
+		"hasWikiEnabled": true,
+		"hasProjectsEnabled": true,
+		"squashMergeAllowed": true,
+		"mergeCommitAllowed": true,
+		"rebaseMergeAllowed": true,
+		"deleteBranchOnMerge": false
+	}`
+	mock := &exec.MockRunner{
+		Responses: []exec.MockCall{
+			{Stdout: jsonResp},
+			{Stdout: "false\n"},
+			{Stderr: "403 Forbidden", Err: fmt.Errorf("exit 1")},
+			{Stdout: ""},
+			{Stdout: ""},
+			{Stdout: ""},
+		},
+	}
+	c := NewClient(mock, "")
+	state, err := c.FetchRepoState(context.Background(), "user/repo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.SquashMergeCommitMessage != nil {
+		t.Errorf("SquashMergeCommitMessage should be nil on API error, got %v", *state.SquashMergeCommitMessage)
 	}
 }
 
@@ -477,6 +653,7 @@ func TestFetchRepoState_AutoMergeUnknownOnError(t *testing.T) {
 		Responses: []exec.MockCall{
 			{Stdout: jsonResp}, // gh repo view --json
 			{Stderr: "403 Forbidden", Err: fmt.Errorf("exit 1")}, // fetchAllowAutoMerge fails
+			{Stdout: `{"title":"PR_TITLE","message":"BLANK"}`},   // fetchSquashMergeCommitMessage
 			{Stdout: ""}, // fetchVulnerabilityAlertsEnabled
 			{Stdout: ""}, // fetchDependencyGraphEnabled
 			{Stdout: ""}, // fetchAutomatedSecurityFixesEnabled
