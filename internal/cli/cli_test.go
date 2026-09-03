@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/jaeyeom/gh-repox/internal/output"
@@ -93,6 +94,24 @@ func TestConfigExplainBadConfig_ExitCode2(t *testing.T) {
 	assertExitCode(t, err, ExitInvalidInput)
 }
 
+func TestCreateInvalidSquashMergeCommitMessage_ExitCode2(t *testing.T) {
+	tmpFile := t.TempDir() + "/repox.yaml"
+	if err := os.WriteFile(tmpFile, []byte("merge:\n  squash_merge_commit_message: bogus\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	err := runCmd("create", "test-repo", "--dry-run", "--owner", "testowner", "--config", tmpFile)
+	assertExitCode(t, err, ExitInvalidInput)
+}
+
+func TestApplyInvalidSquashMergeCommitMessage_ExitCode2(t *testing.T) {
+	tmpFile := t.TempDir() + "/repox.yaml"
+	if err := os.WriteFile(tmpFile, []byte("merge:\n  squash_merge_commit_message: bogus\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	err := runCmd("apply", "testowner/test-repo", "--dry-run", "--config", tmpFile)
+	assertExitCode(t, err, ExitInvalidInput)
+}
+
 func TestCreateConflictingFlags_ExitCode2(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -146,6 +165,16 @@ func TestCreateDryRunJSON(t *testing.T) {
 	if len(result.Commands) == 0 {
 		t.Error("expected non-empty commands list")
 	}
+	foundSquash := false
+	for _, cmd := range result.Commands {
+		if strings.Contains(cmd, `"squash_merge_commit_title":"PR_TITLE"`) && strings.Contains(cmd, `"squash_merge_commit_message":"PR_BODY"`) {
+			foundSquash = true
+			break
+		}
+	}
+	if !foundSquash {
+		t.Errorf("create dry-run should plan squash commit message PATCH, got: %v", result.Commands)
+	}
 }
 
 func TestApplyDryRunJSON(t *testing.T) {
@@ -179,19 +208,30 @@ func TestApplyDryRunJSON(t *testing.T) {
 	if result.Repo != "testowner/test-repo" {
 		t.Errorf("repo = %q, want %q", result.Repo, "testowner/test-repo")
 	}
+	foundSquash := false
+	for _, cmd := range result.Commands {
+		if strings.Contains(cmd, `"squash_merge_commit_title":"PR_TITLE"`) && strings.Contains(cmd, `"squash_merge_commit_message":"PR_BODY"`) {
+			foundSquash = true
+			break
+		}
+	}
+	if !foundSquash {
+		t.Errorf("apply dry-run should plan squash commit message PATCH, got: %v", result.Commands)
+	}
 }
 
 func TestBuildAppliedMapNotPrePopulated(t *testing.T) {
 	p := &policy.DesiredPolicy{
-		Private:             true,
-		AllowSquashMerge:    true,
-		AllowMergeCommit:    false,
-		AllowRebaseMerge:    false,
-		AllowAutoMerge:      true,
-		DeleteBranchOnMerge: true,
-		HasIssues:           true,
-		HasWiki:             false,
-		HasProjects:         false,
+		Private:                  true,
+		AllowSquashMerge:         true,
+		AllowMergeCommit:         false,
+		AllowRebaseMerge:         false,
+		AllowAutoMerge:           true,
+		DeleteBranchOnMerge:      true,
+		SquashMergeCommitMessage: "pr-title-description",
+		HasIssues:                true,
+		HasWiki:                  false,
+		HasProjects:              false,
 	}
 	m := buildAppliedMap(p)
 	if len(m) == 0 {
@@ -199,5 +239,8 @@ func TestBuildAppliedMapNotPrePopulated(t *testing.T) {
 	}
 	if m["private"] != true {
 		t.Errorf("private = %v, want true", m["private"])
+	}
+	if m["squash_merge_commit_message"] != "pr-title-description" {
+		t.Errorf("squash_merge_commit_message = %v, want pr-title-description", m["squash_merge_commit_message"])
 	}
 }

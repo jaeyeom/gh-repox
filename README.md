@@ -11,7 +11,7 @@ gh-repox is a GitHub CLI extension that manages repository policy with sensible,
 - **Diff** repositories to see what settings don't match your policy
 - **Inspect** resolved configuration and trace where each value comes from
 
-By default, gh-repox creates private, empty repositories with squash-only merges enabled and extra features like wiki and projects disabled. All defaults are configurable.
+By default, gh-repox creates private, empty repositories with squash-only merges, squash commit messages set to the pull request title and description, and extra features like wiki and projects disabled. All defaults are configurable.
 
 ## Installation
 
@@ -35,7 +35,7 @@ Create a new private repository with opinionated defaults:
 gh repox create my-service
 ```
 
-That's it. The repository is created as private with squash merges enabled and merge commits disabled.
+That's it. The repository is created as private with squash merges enabled, merge commits disabled, and squash commit messages defaulting to the pull request title and description.
 
 Apply policy to an existing repository:
 
@@ -181,8 +181,9 @@ Empty repositories give you full control over how projects are initialized.
 - **allow_rebase_merge**: false
 - **allow_auto_merge**: true (enable auto-merge when branch is ready)
 - **delete_branch_on_merge**: true (keep repository clean)
+- **squash_merge_commit_message**: pr-title-description (squash commit uses the PR title and body)
 
-Squash-only merges encourage clean, linear history.
+Squash-only merges with PR title and description as the commit log encourage clean, linear history that matches the pull request.
 
 ### Repository Features
 
@@ -245,6 +246,7 @@ merge:
   allow_rebase_merge: false
   allow_auto_merge: true
   delete_branch_on_merge: true
+  squash_merge_commit_message: pr-title-description
 
 security:
   dependency_graph: true

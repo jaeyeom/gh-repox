@@ -171,9 +171,17 @@ This is important:
 - allow_rebase_merge: false
 - allow_auto_merge: true
 - delete_branch_on_merge: true
+- squash_merge_commit_message: pr-title-description
 
 Interpretation:
 - squash merge should be the only enabled merge method by default
+- squash commit messages should default to the pull request title and description
+
+Allowed `squash_merge_commit_message` values (GitHub UI / `gh repo edit --squash-merge-commit-message`):
+- `default`
+- `pr-title`
+- `pr-title-commits`
+- `pr-title-description`
 
 ### Repository features
 
@@ -269,6 +277,7 @@ merge:
   allow_rebase_merge: false
   allow_auto_merge: true
   delete_branch_on_merge: true
+  squash_merge_commit_message: pr-title-description
 
 security:
   dependency_graph: true
@@ -576,6 +585,7 @@ Apply these where supported:
 - rebase merge disabled
 - auto-merge enabled
 - delete branch on merge enabled
+- squash merge commit message set to pull request title and description (`PR_TITLE` + `PR_BODY` via REST API)
 - wiki enabled/disabled
 - issues enabled/disabled if needed
 - projects enabled/disabled if supported
@@ -968,6 +978,7 @@ For `create`:
     "allow_rebase_merge": false,
     "allow_auto_merge": true,
     "delete_branch_on_merge": true,
+    "squash_merge_commit_message": "pr-title-description",
     "has_wiki": false,
     "has_projects": false,
     "dependency_graph": true,

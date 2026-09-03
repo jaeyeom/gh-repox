@@ -9,33 +9,37 @@ import (
 
 func boolPtr(b bool) *bool { return &b }
 
+func stringPtr(s string) *string { return &s }
+
 func TestCompare(t *testing.T) {
 	cfg := config.Defaults()
 	desired := &policy.DesiredPolicy{
-		Private:             true,
-		HasIssues:           true,
-		HasWiki:             false,
-		HasProjects:         false,
-		AllowSquashMerge:    true,
-		AllowMergeCommit:    false,
-		AllowRebaseMerge:    false,
-		AllowAutoMerge:      true,
-		DeleteBranchOnMerge: true,
-		DependencyGraph:     true,
-		DependabotAlerts:    true,
+		Private:                  true,
+		HasIssues:                true,
+		HasWiki:                  false,
+		HasProjects:              false,
+		AllowSquashMerge:         true,
+		AllowMergeCommit:         false,
+		AllowRebaseMerge:         false,
+		AllowAutoMerge:           true,
+		DeleteBranchOnMerge:      true,
+		SquashMergeCommitMessage: "pr-title-description",
+		DependencyGraph:          true,
+		DependabotAlerts:         true,
 	}
 	actual := &policy.ActualState{
-		Private:             true,
-		HasIssues:           true,
-		HasWiki:             true,
-		HasProjects:         false,
-		AllowSquashMerge:    true,
-		AllowMergeCommit:    true,
-		AllowRebaseMerge:    false,
-		AllowAutoMerge:      boolPtr(false),
-		DeleteBranchOnMerge: true,
-		DependencyGraph:     boolPtr(true),
-		DependabotAlerts:    nil,
+		Private:                  true,
+		HasIssues:                true,
+		HasWiki:                  true,
+		HasProjects:              false,
+		AllowSquashMerge:         true,
+		AllowMergeCommit:         true,
+		AllowRebaseMerge:         false,
+		AllowAutoMerge:           boolPtr(false),
+		DeleteBranchOnMerge:      true,
+		SquashMergeCommitMessage: stringPtr("default"),
+		DependencyGraph:          boolPtr(true),
+		DependabotAlerts:         nil,
 	}
 
 	entries := Compare(desired, actual, cfg)
@@ -62,6 +66,9 @@ func TestCompare(t *testing.T) {
 	}
 	if diffs["dependabot_alerts"] != StatusUnknown {
 		t.Error("dependabot_alerts should be unknown")
+	}
+	if diffs["squash_merge_commit_message"] != StatusDifferent {
+		t.Error("squash_merge_commit_message should be different")
 	}
 }
 

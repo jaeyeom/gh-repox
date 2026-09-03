@@ -155,6 +155,9 @@ func (c *Client) EditRepo(ctx context.Context, fullName string, p *policy.Desire
 	if err != nil {
 		return fmt.Errorf("failed to edit repository: %s: %w", strings.TrimSpace(stderr), err)
 	}
+	if err := c.SetSquashMergeCommitMessage(ctx, fullName, p.SquashMergeCommitMessage); err != nil {
+		return fmt.Errorf("failed to edit repository: %w", err)
+	}
 	return nil
 }
 
@@ -229,6 +232,28 @@ func (c *Client) SetAllowAutoMerge(ctx context.Context, fullName string, enable 
 		return fmt.Errorf("could not set allow_auto_merge: %w", err)
 	}
 	return nil
+}
+
+// SetSquashMergeCommitMessage sets the default squash merge commit title and
+// message via the REST API. preset is a GitHub UI value such as
+// "pr-title-description".
+func (c *Client) SetSquashMergeCommitMessage(ctx context.Context, fullName string, preset string) error {
+	body, err := squashMergeCommitMessageJSON(preset)
+	if err != nil {
+		return err
+	}
+	if err := c.patchRepo(ctx, fullName, body); err != nil {
+		return fmt.Errorf("could not set squash merge commit message: %w", err)
+	}
+	return nil
+}
+
+func squashMergeCommitMessageJSON(preset string) (string, error) {
+	title, message, ok := policy.SquashCommitAPIFields(preset)
+	if !ok {
+		return "", fmt.Errorf("invalid squash_merge_commit_message %q", preset)
+	}
+	return fmt.Sprintf(`{"squash_merge_commit_title":%q,"squash_merge_commit_message":%q}`, title, message), nil
 }
 
 // EnableAutomatedSecurityFixes enables Dependabot security updates.
@@ -325,17 +350,18 @@ func (c *Client) FetchRepoState(ctx context.Context, fullName string) (*policy.A
 	}
 
 	state := &policy.ActualState{
-		Private:             rj.IsPrivate,
-		Description:         rj.Description,
-		Homepage:            rj.HomepageURL,
-		HasIssues:           rj.HasIssuesEnabled,
-		HasWiki:             rj.HasWikiEnabled,
-		HasProjects:         rj.HasProjectsEnabled,
-		AllowSquashMerge:    rj.SquashMergeAllowed,
-		AllowMergeCommit:    rj.MergeCommitAllowed,
-		AllowRebaseMerge:    rj.RebaseMergeAllowed,
-		AllowAutoMerge:      c.fetchAllowAutoMerge(ctx, fullName),
-		DeleteBranchOnMerge: rj.DeleteBranchOnMerge,
+		Private:                  rj.IsPrivate,
+		Description:              rj.Description,
+		Homepage:                 rj.HomepageURL,
+		HasIssues:                rj.HasIssuesEnabled,
+		HasWiki:                  rj.HasWikiEnabled,
+		HasProjects:              rj.HasProjectsEnabled,
+		AllowSquashMerge:         rj.SquashMergeAllowed,
+		AllowMergeCommit:         rj.MergeCommitAllowed,
+		AllowRebaseMerge:         rj.RebaseMergeAllowed,
+		AllowAutoMerge:           c.fetchAllowAutoMerge(ctx, fullName),
+		DeleteBranchOnMerge:      rj.DeleteBranchOnMerge,
+		SquashMergeCommitMessage: c.fetchSquashMergeCommitMessage(ctx, fullName),
 	}
 
 	// Fetch security settings via REST API (not available through gh repo view --json).
@@ -359,6 +385,30 @@ func (c *Client) fetchAllowAutoMerge(ctx context.Context, fullName string) *bool
 	}
 	enabled := strings.TrimSpace(stdout) == "true"
 	return &enabled
+}
+
+// fetchSquashMergeCommitMessage reads squash merge commit title/message from
+// the REST API and maps them to the GitHub UI preset. Returns nil on error
+// or when the API values do not match a known preset.
+func (c *Client) fetchSquashMergeCommitMessage(ctx context.Context, fullName string) *string {
+	args := []string{"api", fmt.Sprintf("/repos/%s", fullName), "--jq", "{title:.squash_merge_commit_title,message:.squash_merge_commit_message}"}
+	args = append(args, c.hostArgs()...)
+	stdout, _, err := c.Runner.Run(ctx, "gh", args...)
+	if err != nil {
+		return nil
+	}
+	var fields struct {
+		Title   string `json:"title"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &fields); err != nil {
+		return nil
+	}
+	preset, ok := policy.SquashCommitPreset(fields.Title, fields.Message)
+	if !ok {
+		return nil
+	}
+	return &preset
 }
 
 // fetchVulnerabilityAlertsEnabled checks if Dependabot alerts are enabled.
@@ -529,6 +579,22 @@ func PlannedSecurityCommands(fullName string, p *policy.DesiredPolicy, host stri
 	return cmds
 }
 
+// PlannedSquashMergeCommitMessageCommand returns the REST command that sets
+// the squash merge commit title and message. Empty if the preset is invalid.
+func PlannedSquashMergeCommitMessageCommand(fullName, preset, host string) string {
+	body, err := squashMergeCommitMessageJSON(preset)
+	if err != nil {
+		return ""
+	}
+	ha := HostArgs(host)
+	hostSuffix := ""
+	for _, a := range ha {
+		hostSuffix += " " + output.ShellQuote(a)
+	}
+	qn := output.ShellQuote("/repos/" + fullName)
+	return fmt.Sprintf("echo '%s' | gh api --method PATCH %s --input -%s", body, qn, hostSuffix)
+}
+
 // PlannedCommands returns the list of commands that would be executed.
 func PlannedCommands(p *policy.DesiredPolicy, host string) []string {
 	ha := HostArgs(host)
@@ -541,6 +607,10 @@ func PlannedCommands(p *policy.DesiredPolicy, host string) []string {
 	editArgs := EditRepoArgs(p.FullName(), p)
 	editArgs = append(editArgs, ha...)
 	cmds = append(cmds, output.FormatCommand("gh", editArgs...))
+
+	if cmd := PlannedSquashMergeCommitMessageCommand(p.FullName(), p.SquashMergeCommitMessage, host); cmd != "" {
+		cmds = append(cmds, cmd)
+	}
 
 	cmds = append(cmds, PlannedSecurityCommands(p.FullName(), p, host)...)
 

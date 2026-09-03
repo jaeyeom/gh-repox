@@ -38,6 +38,9 @@ func newApplyCmd() *cobra.Command {
 
 			p := policy.FromConfig(cfg, repo)
 			p.Owner = owner
+			if err := validate.Policy(p); err != nil {
+				return exitErrorf(ExitInvalidInput, "validate apply: %w", err)
+			}
 			fullName := p.FullName()
 
 			runner := &exec.RealRunner{}
@@ -83,6 +86,7 @@ func newApplyCmd() *cobra.Command {
 					"merge commits: "+enabledStr(p.AllowMergeCommit),
 					"rebase merge: "+enabledStr(p.AllowRebaseMerge),
 					"delete branch on merge: "+enabledStr(p.DeleteBranchOnMerge),
+					"squash merge commit message: "+p.SquashMergeCommitMessage,
 					"projects: "+enabledStr(p.HasProjects),
 				)
 			}
@@ -116,6 +120,9 @@ func printApplyDryRun(fullName string, p *policy.DesiredPolicy, cfg *config.Conf
 	editArgs = append(editArgs, ghclient.HostArgs(cfg.Host.Value)...)
 	cmds := []string{
 		output.FormatCommand("gh", editArgs...),
+	}
+	if cmd := ghclient.PlannedSquashMergeCommitMessageCommand(fullName, p.SquashMergeCommitMessage, cfg.Host.Value); cmd != "" {
+		cmds = append(cmds, cmd)
 	}
 	cmds = append(cmds, ghclient.PlannedSecurityCommands(fullName, p, cfg.Host.Value)...)
 	if flagJSON {

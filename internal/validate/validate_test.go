@@ -14,7 +14,7 @@ func TestCreate(t *testing.T) {
 	}{
 		{
 			name:    "valid",
-			policy:  &policy.DesiredPolicy{Owner: "user", Repo: "repo"},
+			policy:  &policy.DesiredPolicy{Owner: "user", Repo: "repo", SquashMergeCommitMessage: "pr-title-description"},
 			wantErr: false,
 		},
 		{
@@ -51,6 +51,21 @@ func TestCreate(t *testing.T) {
 			name:    "template with auto_init",
 			policy:  &policy.DesiredPolicy{Owner: "user", Repo: "repo", Template: "tpl/repo", AutoInit: true},
 			wantErr: true,
+		},
+		{
+			name:    "invalid squash merge commit message",
+			policy:  &policy.DesiredPolicy{Owner: "user", Repo: "repo", SquashMergeCommitMessage: "bogus"},
+			wantErr: true,
+		},
+		{
+			name:    "empty squash merge commit message",
+			policy:  &policy.DesiredPolicy{Owner: "user", Repo: "repo", SquashMergeCommitMessage: ""},
+			wantErr: true,
+		},
+		{
+			name:    "valid squash merge commit message",
+			policy:  &policy.DesiredPolicy{Owner: "user", Repo: "repo", SquashMergeCommitMessage: "pr-title-description"},
+			wantErr: false,
 		},
 	}
 

@@ -20,6 +20,12 @@ func TestDefaults(t *testing.T) {
 	if c.AllowMergeCommit.Value != false {
 		t.Error("default allow_merge_commit should be false")
 	}
+	if c.SquashMergeCommitMessage.Value != SquashCommitMessagePRTitleDescription {
+		t.Errorf("default squash_merge_commit_message should be %q, got %q", SquashCommitMessagePRTitleDescription, c.SquashMergeCommitMessage.Value)
+	}
+	if c.SquashMergeCommitMessage.Source != SourceDefault {
+		t.Error("default squash_merge_commit_message source should be 'default'")
+	}
 	if c.HasWiki.Value != false {
 		t.Error("default has_wiki should be false")
 	}
@@ -65,6 +71,34 @@ merge:
 	}
 	if c.AllowSquashMerge.Source != SourceDefault {
 		t.Error("unset allow_squash_merge source should remain default")
+	}
+	if c.SquashMergeCommitMessage.Value != SquashCommitMessagePRTitleDescription {
+		t.Errorf("unset squash_merge_commit_message should remain default %q, got %q", SquashCommitMessagePRTitleDescription, c.SquashMergeCommitMessage.Value)
+	}
+	if c.SquashMergeCommitMessage.Source != SourceDefault {
+		t.Error("unset squash_merge_commit_message source should remain default")
+	}
+}
+
+func TestLoadFile_SquashMergeCommitMessage(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	content := `
+merge:
+  squash_merge_commit_message: pr-title
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c := Defaults()
+	if err := c.LoadFile(path); err != nil {
+		t.Fatal(err)
+	}
+	if c.SquashMergeCommitMessage.Value != SquashCommitMessagePRTitle {
+		t.Errorf("got squash_merge_commit_message=%q, want %q", c.SquashMergeCommitMessage.Value, SquashCommitMessagePRTitle)
+	}
+	if c.SquashMergeCommitMessage.Source != SourceConfig {
+		t.Errorf("got source=%q, want config", c.SquashMergeCommitMessage.Source)
 	}
 }
 
@@ -140,5 +174,20 @@ func TestEntries(t *testing.T) {
 	}
 	if !found {
 		t.Error("should have 'private' entry")
+	}
+	found = false
+	for _, e := range entries {
+		if e.Key == "squash_merge_commit_message" {
+			found = true
+			if e.Value != SquashCommitMessagePRTitleDescription {
+				t.Errorf("squash_merge_commit_message entry value = %v, want %q", e.Value, SquashCommitMessagePRTitleDescription)
+			}
+			if e.Source != SourceDefault {
+				t.Errorf("squash_merge_commit_message entry source = %q, want default", e.Source)
+			}
+		}
+	}
+	if !found {
+		t.Error("should have 'squash_merge_commit_message' entry")
 	}
 }
