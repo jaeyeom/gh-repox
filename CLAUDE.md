@@ -41,3 +41,17 @@ gh-repox is a precompiled Go GitHub CLI extension that manages repository policy
 - Dependencies: cobra, yaml.v3 (kept minimal)
 - Tests use table-driven patterns and `t.TempDir()` / `t.Setenv()`
 - No hardcoded usernames; owner is inferred from `gh api user --jq .login`
+
+## Pull requests
+
+This repository squash-merges with the pull request title and description
+as the commit message. HTML comments (`<!-- ... -->`) in the PR body are
+copied into `git log` even though GitHub hides them in the rendered
+description.
+
+When creating or updating a PR:
+- Do not copy `<!-- ... -->` hints from `.github/pull_request_template.md`
+  into the submitted body. They are compose-time hints only.
+- Delete unused optional sections instead of leaving them empty.
+
+A workflow strips leftover comments from the stored body as a backstop.
