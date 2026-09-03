@@ -183,6 +183,8 @@ Empty repositories give you full control over how projects are initialized.
 - **delete_branch_on_merge**: true (keep repository clean)
 - **squash_merge_commit_message**: pr-title-description (squash commit uses the PR title and body)
 
+  Allowed values: `default`, `pr-title`, `pr-title-commits`, `pr-title-description`.
+
 Squash-only merges with PR title and description as the commit log encourage clean, linear history that matches the pull request.
 
 ### Repository Features

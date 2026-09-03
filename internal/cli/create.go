@@ -261,6 +261,8 @@ func executeCreate(ctx context.Context, client *ghclient.Client, cfg *config.Con
 		result.Applied = buildAppliedMap(p)
 	}
 
+	applyCreateSquashMergeCommitMessage(ctx, client, p, result)
+
 	secApplied, secWarnings := client.ApplySecuritySettings(ctx, p.FullName(), p, true)
 	for _, s := range secApplied {
 		result.Applied[s] = true
@@ -332,16 +334,26 @@ func initStr(p *policy.DesiredPolicy) string {
 	return "empty repository"
 }
 
+func applyCreateSquashMergeCommitMessage(ctx context.Context, client *ghclient.Client, p *policy.DesiredPolicy, result *output.CreateResult) {
+	err := ghclient.RetryOnNotFound(ctx, ghclient.DefaultRetryAttempts, ghclient.DefaultRetryDelay, func() error {
+		return client.SetSquashMergeCommitMessage(ctx, p.FullName(), p.SquashMergeCommitMessage)
+	})
+	if err != nil {
+		result.Warnings = append(result.Warnings, err.Error())
+		return
+	}
+	result.Applied["squash_merge_commit_message"] = p.SquashMergeCommitMessage
+}
+
 func buildAppliedMap(p *policy.DesiredPolicy) map[string]any {
 	return map[string]any{
-		"private":                     p.Private,
-		"allow_squash_merge":          p.AllowSquashMerge,
-		"allow_merge_commit":          p.AllowMergeCommit,
-		"allow_rebase_merge":          p.AllowRebaseMerge,
-		"delete_branch_on_merge":      p.DeleteBranchOnMerge,
-		"squash_merge_commit_message": p.SquashMergeCommitMessage,
-		"has_issues":                  p.HasIssues,
-		"has_wiki":                    p.HasWiki,
-		"has_projects":                p.HasProjects,
+		"private":                p.Private,
+		"allow_squash_merge":     p.AllowSquashMerge,
+		"allow_merge_commit":     p.AllowMergeCommit,
+		"allow_rebase_merge":     p.AllowRebaseMerge,
+		"delete_branch_on_merge": p.DeleteBranchOnMerge,
+		"has_issues":             p.HasIssues,
+		"has_wiki":               p.HasWiki,
+		"has_projects":           p.HasProjects,
 	}
 }

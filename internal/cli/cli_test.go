@@ -222,16 +222,15 @@ func TestApplyDryRunJSON(t *testing.T) {
 
 func TestBuildAppliedMapNotPrePopulated(t *testing.T) {
 	p := &policy.DesiredPolicy{
-		Private:                  true,
-		AllowSquashMerge:         true,
-		AllowMergeCommit:         false,
-		AllowRebaseMerge:         false,
-		AllowAutoMerge:           true,
-		DeleteBranchOnMerge:      true,
-		SquashMergeCommitMessage: "pr-title-description",
-		HasIssues:                true,
-		HasWiki:                  false,
-		HasProjects:              false,
+		Private:             true,
+		AllowSquashMerge:    true,
+		AllowMergeCommit:    false,
+		AllowRebaseMerge:    false,
+		AllowAutoMerge:      true,
+		DeleteBranchOnMerge: true,
+		HasIssues:           true,
+		HasWiki:             false,
+		HasProjects:         false,
 	}
 	m := buildAppliedMap(p)
 	if len(m) == 0 {
@@ -240,7 +239,7 @@ func TestBuildAppliedMapNotPrePopulated(t *testing.T) {
 	if m["private"] != true {
 		t.Errorf("private = %v, want true", m["private"])
 	}
-	if m["squash_merge_commit_message"] != "pr-title-description" {
-		t.Errorf("squash_merge_commit_message = %v, want pr-title-description", m["squash_merge_commit_message"])
+	if _, ok := m["squash_merge_commit_message"]; ok {
+		t.Error("squash_merge_commit_message is applied via REST PATCH, not buildAppliedMap")
 	}
 }

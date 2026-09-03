@@ -180,7 +180,7 @@ func TestEditRepoArgs(t *testing.T) {
 	}
 }
 
-func TestEditRepo_SetsSquashMergeCommitMessage(t *testing.T) {
+func TestEditRepo_DoesNotSetSquashMergeCommitMessage(t *testing.T) {
 	p := &policy.DesiredPolicy{
 		Owner:                    "user",
 		Repo:                     "repo",
@@ -190,23 +190,21 @@ func TestEditRepo_SetsSquashMergeCommitMessage(t *testing.T) {
 	mock := &exec.MockRunner{
 		Responses: []exec.MockCall{
 			{Stdout: ""}, // gh repo edit
-			{Stdout: ""}, // PATCH squash merge commit message
 		},
 	}
 	c := NewClient(mock, "")
 	if err := c.EditRepo(context.Background(), "user/repo", p); err != nil {
 		t.Fatal(err)
 	}
-	if len(mock.Calls) != 2 {
-		t.Fatalf("got %d calls, want 2 (edit + squash commit PATCH)", len(mock.Calls))
+	if len(mock.Calls) != 1 {
+		t.Fatalf("got %d calls, want 1 (gh repo edit only)", len(mock.Calls))
 	}
 	editJoined := strings.Join(mock.Calls[0].Args, " ")
 	if !strings.Contains(editJoined, "repo edit user/repo") {
-		t.Errorf("first call should be gh repo edit, got: %s", editJoined)
+		t.Errorf("call should be gh repo edit, got: %s", editJoined)
 	}
-	patchJoined := strings.Join(mock.Calls[1].Args, " ")
-	if !strings.Contains(patchJoined, "api --method PATCH /repos/user/repo") {
-		t.Errorf("second call should PATCH squash commit message, got: %s", patchJoined)
+	if strings.Contains(editJoined, "squash_merge_commit") {
+		t.Errorf("EditRepo should not PATCH squash commit message, got: %s", editJoined)
 	}
 }
 

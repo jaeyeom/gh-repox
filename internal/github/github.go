@@ -155,9 +155,6 @@ func (c *Client) EditRepo(ctx context.Context, fullName string, p *policy.Desire
 	if err != nil {
 		return fmt.Errorf("failed to edit repository: %s: %w", strings.TrimSpace(stderr), err)
 	}
-	if err := c.SetSquashMergeCommitMessage(ctx, fullName, p.SquashMergeCommitMessage); err != nil {
-		return fmt.Errorf("failed to edit repository: %w", err)
-	}
 	return nil
 }
 

@@ -72,6 +72,23 @@ func TestCompare(t *testing.T) {
 	}
 }
 
+func TestCompare_SquashMergeCommitMessageUnknown(t *testing.T) {
+	cfg := config.Defaults()
+	desired := &policy.DesiredPolicy{SquashMergeCommitMessage: "pr-title-description"}
+	actual := &policy.ActualState{SquashMergeCommitMessage: nil}
+
+	entries := Compare(desired, actual, cfg)
+	for _, e := range entries {
+		if e.Field == "squash_merge_commit_message" {
+			if e.Status != StatusUnknown {
+				t.Errorf("status = %q, want unknown", e.Status)
+			}
+			return
+		}
+	}
+	t.Fatal("missing squash_merge_commit_message entry")
+}
+
 func TestFormatHuman_NoDiffs(t *testing.T) {
 	entries := []Entry{
 		{Field: "private", Current: true, Desired: true, DesiredSource: "default", Status: StatusSame},
