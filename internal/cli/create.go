@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -38,12 +39,15 @@ func newCreateCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "create <name>",
+		Use:   "create <name> | <owner/repo>",
 		Short: "Create a new repository with opinionated defaults",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			repoName := args[0]
+			repoName, explicitOwner, err := splitCreateTarget(args[0])
+			if err != nil {
+				return exitErrorf(ExitInvalidInput, "%w", err)
+			}
 
 			// Reject conflicting flag pairs
 			conflicts := [][2]string{
@@ -70,6 +74,14 @@ func newCreateCmd() *cobra.Command {
 			applyCreateInitFlags(cfg, flagAddReadme, flagGitignore, flagLicense, flagTemplate,
 				flagClone, flagCloneDir, flagCloneArgs, flagOpen)
 
+			if explicitOwner != "" {
+				if err := rejectExplicitOwnerConflict(explicitOwner, args[0]); err != nil {
+					return err
+				}
+				// A config or env org would override the owner in owner/repo.
+				applyExplicitCreateOwner(cfg, explicitOwner)
+			}
+
 			// Resolve owner
 			if err := resolveOwner(ctx, cfg); err != nil {
 				return exitErrorf(ExitNoAuth, "%s", err)
@@ -91,7 +103,7 @@ func newCreateCmd() *cobra.Command {
 				if flagJSON {
 					return printCreateDryRunJSON(repoName, p, cfg)
 				}
-				printCreateDryRun(repoName, p, cfg)
+				printCreateDryRun(args[0], p, cfg)
 				return nil
 			}
 
@@ -120,6 +132,36 @@ func newCreateCmd() *cobra.Command {
 	f.BoolVar(&flagOpen, "open", false, "Open repo in browser after success")
 
 	return cmd
+}
+
+// splitCreateTarget accepts a bare repository name or owner/repo.
+// A slash is parsed with the same rules as apply and diff.
+func splitCreateTarget(arg string) (repoName, explicitOwner string, err error) {
+	if !strings.Contains(arg, "/") {
+		return arg, "", nil
+	}
+	owner, repo, err := validate.ParseOwnerRepo(arg)
+	if err != nil {
+		return "", "", fmt.Errorf("parse repo: %w", err)
+	}
+	return repo, owner, nil
+}
+
+func rejectExplicitOwnerConflict(explicitOwner, arg string) error {
+	if flagOrg != "" && flagOrg != explicitOwner {
+		return exitErrorf(ExitInvalidInput, "owner %q in %q conflicts with --org %q", explicitOwner, arg, flagOrg)
+	}
+	if flagOwner != "" && flagOwner != explicitOwner {
+		return exitErrorf(ExitInvalidInput, "owner %q in %q conflicts with --owner %q", explicitOwner, arg, flagOwner)
+	}
+	return nil
+}
+
+func applyExplicitCreateOwner(cfg *config.Config, explicitOwner string) {
+	cfg.Owner.Set(explicitOwner, config.SourceFlag)
+	if cfg.Org.Value != "" && cfg.Org.Value != explicitOwner {
+		cfg.Org.Set("", config.SourceFlag)
+	}
 }
 
 func applyCreateRepoFlags(

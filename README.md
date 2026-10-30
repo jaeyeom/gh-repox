@@ -63,12 +63,16 @@ Create a new repository with resolved defaults.
 
 ```bash
 gh repox create <name> [flags]
+gh repox create <owner/repo> [flags]
 ```
+
+A bare name uses `--org`, then `--owner`, then config or environment, then the authenticated user. `owner/repo` creates the repository under that owner. Config, environment, and the authenticated user do not override that owner. If `--org` or `--owner` names a different owner, the command fails.
 
 Examples:
 
 ```bash
 gh repox create my-service
+gh repox create acme/my-service
 gh repox create my-service --public
 gh repox create my-service --clone
 gh repox create my-service --org acme
