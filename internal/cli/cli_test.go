@@ -220,6 +220,167 @@ func TestApplyDryRunJSON(t *testing.T) {
 	}
 }
 
+func runCmdCapture(t *testing.T, args ...string) (string, error) {
+	t.Helper()
+	old := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+	cmdErr := runCmd(args...)
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = old
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("read stdout: %v", err)
+	}
+	return buf.String(), cmdErr
+}
+
+func decodeCreateDryRun(t *testing.T, out string) output.DryRunResult {
+	t.Helper()
+	var result output.DryRunResult
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, out)
+	}
+	return result
+}
+
+func TestCreateOwnerRepoDryRunJSON(t *testing.T) {
+	out, err := runCmdCapture(t, "create", "jaeyeom/agentic-factory", "--dry-run", "--json", "--clone")
+	if err != nil {
+		t.Fatalf("unexpected error: %v\noutput: %s", err, out)
+	}
+	result := decodeCreateDryRun(t, out)
+	if result.Repo != "jaeyeom/agentic-factory" {
+		t.Errorf("repo = %q, want %q", result.Repo, "jaeyeom/agentic-factory")
+	}
+	var cloneCmd string
+	for _, cmd := range result.Commands {
+		if strings.Contains(cmd, "repo clone") {
+			cloneCmd = cmd
+			break
+		}
+	}
+	if cloneCmd != "gh repo clone jaeyeom/agentic-factory" {
+		t.Errorf("clone command = %q, want destination to stay the repository name", cloneCmd)
+	}
+}
+
+func TestCreateOwnerRepoIgnoresConfigAndEnvOwner(t *testing.T) {
+	cfgPath := t.TempDir() + "/repox.yaml"
+	body := "github:\n  owner: configowner\n  org: configorg\n"
+	if err := os.WriteFile(cfgPath, []byte(body), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("REPOX_OWNER", "envowner")
+	t.Setenv("REPOX_ORG", "envorg")
+
+	out, err := runCmdCapture(t, "create", "jaeyeom/agentic-factory", "--dry-run", "--json", "--config", cfgPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v\noutput: %s", err, out)
+	}
+	result := decodeCreateDryRun(t, out)
+	if result.Repo != "jaeyeom/agentic-factory" {
+		t.Errorf("repo = %q, want positional owner to win over config and env", result.Repo)
+	}
+}
+
+func TestCreateBareNameOrgOverridesOwner(t *testing.T) {
+	out, err := runCmdCapture(t, "create", "my-service", "--dry-run", "--json", "--org", "acme", "--owner", "someone")
+	if err != nil {
+		t.Fatalf("unexpected error: %v\noutput: %s", err, out)
+	}
+	result := decodeCreateDryRun(t, out)
+	if result.Repo != "acme/my-service" {
+		t.Errorf("repo = %q, want %q", result.Repo, "acme/my-service")
+	}
+}
+
+func TestCreateOwnerRepoFlagConflict(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantMsg string
+	}{
+		{
+			name:    "org differs",
+			args:    []string{"create", "jaeyeom/agentic-factory", "--dry-run", "--org", "other"},
+			wantMsg: `conflicts with --org "other"`,
+		},
+		{
+			name:    "owner differs",
+			args:    []string{"create", "jaeyeom/agentic-factory", "--dry-run", "--owner", "other"},
+			wantMsg: `conflicts with --owner "other"`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := runCmd(tt.args...)
+			assertExitCode(t, err, ExitInvalidInput)
+			if !strings.Contains(err.Error(), tt.wantMsg) {
+				t.Errorf("error = %v, want substring %q", err, tt.wantMsg)
+			}
+		})
+	}
+}
+
+func TestCreateOwnerRepoMatchingFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "org matches", args: []string{"create", "jaeyeom/agentic-factory", "--dry-run", "--json", "--org", "jaeyeom"}},
+		{name: "owner matches", args: []string{"create", "jaeyeom/agentic-factory", "--dry-run", "--json", "--owner", "jaeyeom"}},
+		{name: "both match", args: []string{"create", "jaeyeom/agentic-factory", "--dry-run", "--json", "--org", "jaeyeom", "--owner", "jaeyeom"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := runCmdCapture(t, tt.args...)
+			if err != nil {
+				t.Fatalf("unexpected error: %v\noutput: %s", err, out)
+			}
+			result := decodeCreateDryRun(t, out)
+			if result.Repo != "jaeyeom/agentic-factory" {
+				t.Errorf("repo = %q, want %q", result.Repo, "jaeyeom/agentic-factory")
+			}
+		})
+	}
+}
+
+func TestCreateInvalidOwnerRepo(t *testing.T) {
+	tests := []struct {
+		name    string
+		arg     string
+		wantMsg string
+	}{
+		{name: "empty repo", arg: "owner/", wantMsg: "invalid repo format"},
+		{name: "empty owner", arg: "/repo", wantMsg: "invalid repo format"},
+		{name: "extra slash", arg: "a/b/c", wantMsg: `invalid repository name "b/c"`},
+		{name: "invalid owner", arg: "bad;owner/repo", wantMsg: "invalid owner"},
+		{name: "invalid repo", arg: "owner/bad;repo", wantMsg: "invalid repository name"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := runCmd("create", tt.arg, "--dry-run")
+			assertExitCode(t, err, ExitInvalidInput)
+			if !strings.Contains(err.Error(), tt.wantMsg) {
+				t.Errorf("error = %v, want substring %q", err, tt.wantMsg)
+			}
+		})
+	}
+}
+
+func TestCreateUsageDocumentsOwnerRepo(t *testing.T) {
+	cmd := newCreateCmd()
+	if cmd.Use != "create <name> | <owner/repo>" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "create <name> | <owner/repo>")
+	}
+}
+
 func TestBuildAppliedMapNotPrePopulated(t *testing.T) {
 	p := &policy.DesiredPolicy{
 		Private:             true,
