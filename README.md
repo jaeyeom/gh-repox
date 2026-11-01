@@ -429,6 +429,9 @@ Run all unit tests:
 make test
 ```
 
+The live GitHub test is not part of `make test`. It runs inside
+[`make pre-release`](#pre-release-check).
+
 Run tests with coverage:
 
 ```bash
@@ -483,18 +486,28 @@ gh repox --help
 
 ## Releasing
 
-### Release-readiness check
+### Pre-release check
 
-Before tagging a release, verify that the project cross-compiles for all
-supported platforms:
+Before tagging a release, run:
 
 ```bash
-make release-check
+make pre-release
 ```
 
-This builds binaries for macOS (amd64/arm64), Linux (amd64/arm64), and Windows
-(amd64) into the `dist/` directory — the same platforms targeted by the release
-workflow. If any platform fails to compile, fix the issue before publishing.
+This runs, in order:
+
+1. `make check` — formatting, vet, golangci-lint, and unit tests. CI runs this
+   same target.
+2. `make release-check` — cross-compiles macOS (amd64/arm64), Linux
+   (amd64/arm64), and Windows (amd64) into `dist/`, the same platforms the
+   release workflow publishes. If any platform fails to compile, fix it before
+   tagging.
+3. `TestIntegrationCreateAndVerify` — creates a private repository, sets the
+   squash merge commit message, and checks that GitHub stored it.
+
+The live test needs a normal `gh auth login`. It does not delete the
+repository. After a run, delete the private `gh-repox-smoke-*` repository in
+the GitHub website. `make check` and CI skip this test.
 
 ### Publishing a release
 
@@ -519,11 +532,12 @@ gh extension upgrade jaeyeom/gh-repox
 | Path | Artifact | Purpose |
 |------|----------|---------|
 | `make build` | `./gh-repox` (git-ignored) | Local development and testing only |
-| `make release-check` | `dist/*` (git-ignored) | Verify cross-compilation before tagging |
+| `make release-check` | `dist/*` (git-ignored) | Cross-compile only; included in `make pre-release` |
+| `make pre-release` | checks, `dist/*`, and a temporary private repo | Full gate before tagging |
 | `git push origin v*` | GitHub release binaries | Public installation via `gh extension install` |
 
 A successful `make build` does **not** guarantee that the repository is publicly
-installable. Always run `make release-check` before publishing a new tag.
+installable. Always run `make pre-release` before publishing a new tag.
 
 ## Architecture
 

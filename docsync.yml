@@ -505,7 +505,7 @@ rules:
     docs:
       - path: docs/PROMPT.md
         section: "### Integration tests"
-        why: "live create-and-delete against GitHub"
+        why: "live create and verify; the smoke repo is left in place"
       - path: docs/PROMPT.md
         section: "### Manual tests"
         why: "create/apply/diff against a real repo"
@@ -636,16 +636,16 @@ rules:
         why: "make install to GOPATH/bin"
       - path: README.md
         section: "## Releasing"
-        why: "make release-check before tagging"
+        why: "make pre-release before tagging"
       - path: README.md
-        section: "### Release-readiness check"
-        why: "make release-check cross-compile platforms"
+        section: "### Pre-release check"
+        why: "make pre-release includes release-check cross-compile"
       - path: README.md
         section: "### Local builds vs public installation"
-        why: "make build vs release-check vs tagged release"
+        why: "make build vs release-check vs pre-release vs tagged release"
       - path: CLAUDE.md
         section: "## Build & Test Commands"
-        why: "make all/check/build/test/coverage/format/lint"
+        why: "make all/check/pre-release/build/test/coverage/format/lint"
       - path: .github/pull_request_template.md
         section: "## Test plan"
         why: "make check is green"

@@ -12,12 +12,13 @@ import (
 	"github.com/jaeyeom/gh-repox/internal/policy"
 )
 
-// TestIntegrationCreateAndDelete exercises the real gh CLI against GitHub.
-// It is skipped unless GH_REPOX_INTEGRATION=1 is set.
+// TestIntegrationCreateAndVerify exercises create, edit, and the squash merge
+// commit message against GitHub. It is skipped unless GH_REPOX_INTEGRATION=1
+// is set. The repository is left in place; deleting it does not test gh-repox.
 //
 // Prerequisites:
-//   - gh auth login (the authenticated user must be able to create/delete repos)
-func TestIntegrationCreateAndDelete(t *testing.T) {
+//   - gh auth login with the repo scope
+func TestIntegrationCreateAndVerify(t *testing.T) {
 	if os.Getenv("GH_REPOX_INTEGRATION") != "1" {
 		t.Skip("skipping integration test; set GH_REPOX_INTEGRATION=1 to run")
 	}
@@ -34,12 +35,6 @@ func TestIntegrationCreateAndDelete(t *testing.T) {
 
 	repoName := fmt.Sprintf("gh-repox-smoke-%d", time.Now().UnixMilli())
 	fullName := login + "/" + repoName
-
-	// Ensure cleanup even on failure.
-	t.Cleanup(func() {
-		// gh repo delete requires --yes to skip confirmation.
-		_, _, _ = runner.Run(ctx, "gh", "repo", "delete", fullName, "--yes")
-	})
 
 	// 1. Repo should not exist yet.
 	exists, err := client.RepoExists(ctx, fullName)
@@ -97,7 +92,15 @@ func TestIntegrationCreateAndDelete(t *testing.T) {
 		t.Fatalf("EditRepo: %v", err)
 	}
 
-	// 5. Fetch state and verify key settings roundtripped.
+	// 5. Set the squash merge commit message the same way create does.
+	// EditRepo intentionally leaves this to a separate REST PATCH.
+	if err := ghclient.RetryOnNotFound(ctx, ghclient.DefaultRetryAttempts, ghclient.DefaultRetryDelay, func() error {
+		return client.SetSquashMergeCommitMessage(ctx, fullName, p.SquashMergeCommitMessage)
+	}); err != nil {
+		t.Fatalf("SetSquashMergeCommitMessage: %v", err)
+	}
+
+	// 6. Fetch state and verify key settings roundtripped.
 	state, err := client.FetchRepoState(ctx, fullName)
 	if err != nil {
 		t.Fatalf("FetchRepoState: %v", err)
@@ -122,6 +125,5 @@ func TestIntegrationCreateAndDelete(t *testing.T) {
 		t.Errorf("expected squash_merge_commit_message=pr-title-description, got %s", got)
 	}
 
-	t.Logf("integration smoke test passed for %s", fullName)
-	// Cleanup runs via t.Cleanup above.
+	t.Logf("integration smoke test passed for %s; left in place for manual deletion", fullName)
 }
