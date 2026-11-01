@@ -505,7 +505,7 @@ rules:
     docs:
       - path: docs/PROMPT.md
         section: "### Integration tests"
-        why: "live create and verify; the smoke repo is left in place"
+        why: "live create and verify; smoke-repo delete is best-effort"
       - path: docs/PROMPT.md
         section: "### Manual tests"
         why: "create/apply/diff against a real repo"

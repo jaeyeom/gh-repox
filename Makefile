@@ -41,7 +41,9 @@ release-check:
 	@echo "All platforms built successfully in dist/"
 
 ## pre-release: check, cross-compile, then the live GitHub integration test
-## Requires gh auth. Not part of make check or CI. Leaves the smoke repo in place.
+## Requires gh auth. Not part of make check or CI.
+## GH_REPOX_DELETE_TOKEN, when set, is used only to delete the smoke repo.
+## A failed delete does not fail the test.
 pre-release:
 	$(MAKE) check
 	$(MAKE) release-check

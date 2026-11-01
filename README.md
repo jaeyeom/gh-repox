@@ -505,9 +505,12 @@ This runs, in order:
 3. `TestIntegrationCreateAndVerify` — creates a private repository, sets the
    squash merge commit message, and checks that GitHub stored it.
 
-The live test needs a normal `gh auth login`. It does not delete the
-repository. After a run, delete the private `gh-repox-smoke-*` repository in
-the GitHub website. `make check` and CI skip this test.
+The live test needs a normal `gh auth login`. Afterward it tries to delete
+the private `gh-repox-smoke-*` repository. Set `GH_REPOX_DELETE_TOKEN` to a
+token with the `delete_repo` scope when you want that cleanup to succeed;
+the token is used only for `gh repo delete`. If deletion fails, the test
+still passes and the repository remains for you to delete in the GitHub
+website. `make check` and CI skip this test.
 
 ### Publishing a release
 
