@@ -17,7 +17,7 @@ check: check-format lint test
 
 # ── Build ───────────────────────────────────────────────────────────
 
-.PHONY: build clean install release-check
+.PHONY: build clean install release-check pre-release
 
 ## build: compile the CLI binary (local development only)
 build:
@@ -39,6 +39,15 @@ release-check:
 		GOOS=$$os GOARCH=$$arch go build $(GOFLAGS) -o "$$output" ./cmd/gh-repox || exit 1; \
 	done
 	@echo "All platforms built successfully in dist/"
+
+## pre-release: check, cross-compile, then the live GitHub integration test
+## Requires gh auth. Not part of make check or CI.
+## GH_REPOX_DELETE_TOKEN, when set, is used only to delete the smoke repo.
+## A failed delete does not fail the test.
+pre-release:
+	$(MAKE) check
+	$(MAKE) release-check
+	GH_REPOX_INTEGRATION=1 go test -count=1 -v ./internal/github/ -run TestIntegrationCreateAndVerify
 
 ## clean: remove build artifacts and coverage files
 clean:

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	osexec "os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,12 +14,16 @@ import (
 	"github.com/jaeyeom/gh-repox/internal/policy"
 )
 
-// TestIntegrationCreateAndDelete exercises the real gh CLI against GitHub.
-// It is skipped unless GH_REPOX_INTEGRATION=1 is set.
+// TestIntegrationCreateAndVerify exercises create, edit, and the squash merge
+// commit message against GitHub. It is skipped unless GH_REPOX_INTEGRATION=1
+// is set. Cleanup tries to delete the repository and ignores failure: a
+// missing delete_repo scope does not fail the test. Set GH_REPOX_DELETE_TOKEN
+// to a token with the delete_repo scope to make that cleanup succeed. The
+// token is used only for gh repo delete.
 //
 // Prerequisites:
-//   - gh auth login (the authenticated user must be able to create/delete repos)
-func TestIntegrationCreateAndDelete(t *testing.T) {
+//   - gh auth login with the repo scope
+func TestIntegrationCreateAndVerify(t *testing.T) {
 	if os.Getenv("GH_REPOX_INTEGRATION") != "1" {
 		t.Skip("skipping integration test; set GH_REPOX_INTEGRATION=1 to run")
 	}
@@ -35,10 +41,17 @@ func TestIntegrationCreateAndDelete(t *testing.T) {
 	repoName := fmt.Sprintf("gh-repox-smoke-%d", time.Now().UnixMilli())
 	fullName := login + "/" + repoName
 
-	// Ensure cleanup even on failure.
+	// Best-effort cleanup. Deletion is not part of what this test asserts.
+	var created bool
 	t.Cleanup(func() {
-		// gh repo delete requires --yes to skip confirmation.
-		_, _, _ = runner.Run(ctx, "gh", "repo", "delete", fullName, "--yes")
+		if !created {
+			return
+		}
+		if err := deleteSmokeRepo(ctx, fullName); err != nil {
+			t.Logf("left %s in place; delete failed: %v", fullName, err)
+			return
+		}
+		t.Logf("deleted %s", fullName)
 	})
 
 	// 1. Repo should not exist yet.
@@ -72,6 +85,7 @@ func TestIntegrationCreateAndDelete(t *testing.T) {
 	if url == "" {
 		t.Fatal("CreateRepo returned empty URL")
 	}
+	created = true
 	t.Logf("created repo: %s (%s)", fullName, url)
 
 	// 3. Repo should exist now (allow brief propagation delay).
@@ -97,7 +111,15 @@ func TestIntegrationCreateAndDelete(t *testing.T) {
 		t.Fatalf("EditRepo: %v", err)
 	}
 
-	// 5. Fetch state and verify key settings roundtripped.
+	// 5. Set the squash merge commit message the same way create does.
+	// EditRepo intentionally leaves this to a separate REST PATCH.
+	if err := ghclient.RetryOnNotFound(ctx, ghclient.DefaultRetryAttempts, ghclient.DefaultRetryDelay, func() error {
+		return client.SetSquashMergeCommitMessage(ctx, fullName, p.SquashMergeCommitMessage)
+	}); err != nil {
+		t.Fatalf("SetSquashMergeCommitMessage: %v", err)
+	}
+
+	// 6. Fetch state and verify key settings roundtripped.
 	state, err := client.FetchRepoState(ctx, fullName)
 	if err != nil {
 		t.Fatalf("FetchRepoState: %v", err)
@@ -123,5 +145,20 @@ func TestIntegrationCreateAndDelete(t *testing.T) {
 	}
 
 	t.Logf("integration smoke test passed for %s", fullName)
-	// Cleanup runs via t.Cleanup above.
+}
+
+// deleteSmokeRepo removes the private repository created by the integration
+// test. GH_REPOX_DELETE_TOKEN, when set, is sent only to this command as
+// GH_TOKEN. A failure is returned to the caller and does not by itself fail
+// the test.
+func deleteSmokeRepo(ctx context.Context, fullName string) error {
+	cmd := osexec.CommandContext(ctx, "gh", "repo", "delete", fullName, "--yes")
+	if token := os.Getenv("GH_REPOX_DELETE_TOKEN"); token != "" {
+		cmd.Env = append(os.Environ(), "GH_TOKEN="+token)
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err)
+	}
+	return nil
 }

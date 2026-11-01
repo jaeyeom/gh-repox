@@ -8,6 +8,7 @@ gh-repox is a precompiled Go GitHub CLI extension that manages repository policy
 
 - `make all` — format, fix, test, build (full local workflow)
 - `make check` — CI-safe checks (no mutation)
+- `make pre-release` — check, cross-compile, and the live GitHub integration test (needs `gh auth`; best-effort delete via `GH_REPOX_DELETE_TOKEN`; not CI)
 - `make build` — compile binary to `./gh-repox`
 - `make test` — run all tests
 - `make coverage` — generate coverage profile
